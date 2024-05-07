@@ -1,5 +1,6 @@
 use std::fmt::Formatter;
 use derive_more::From;
+
 pub type Result<T> = core::result::Result<T, Error>;
 // pub type Error = Box<dyn std::error::Error>; // For tests and early development
 
@@ -11,6 +12,10 @@ pub enum Error{
     // -- External
     #[from]
     Io(std::io::Error),
+
+    #[from]
+    SurrealDB(surrealdb::Error)
+
 }
 
 
