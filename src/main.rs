@@ -4,19 +4,16 @@ mod model;
 mod rest_api;
 mod time;
 
+use axum::Router;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use model::Process;
-use std::time::{Duration, UNIX_EPOCH};
-use surrealdb::engine::remote::ws::Ws;
-use surrealdb::sql::Uuid as SUUID;
+use tokio::net::TcpListener;
+
 
 pub use self::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use surrealdb::engine::local::Db;
-use surrealdb::opt::auth::Root;
-use surrealdb::Surreal;
+
 
 //use surrealdb::engine::local::Mem; uncomment after moving to in memory DB
 //use once_cell::sync::Lazy;
@@ -31,6 +28,14 @@ async fn main() -> Result<()> {
     let database = db::new().await?;
     database.connect().await?;
 
+    let routes_all = Router::new()
+        .merge(rest_api::routes(database));
+
+    let listener = TcpListener::bind("0.0.0.0:8050").await.unwrap();
+    axum::serve(listener, routes_all.into_make_service())
+        .await
+        .unwrap();
+
     // let _pp: Vec<Process> = database
     //     .conn
     //     .create("process")
@@ -44,9 +49,9 @@ async fn main() -> Result<()> {
     //     })
     //     .await?;
 
-    let process: Vec<Process> = database.conn.select("process").await?;
+    // let process: Vec<Process> = database.conn.select("process").await?;
 
-    println!("{:?}", process);
+    // println!("{:?}", process);
 
     Ok(())
 }
