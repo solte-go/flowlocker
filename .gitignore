@@ -15,5 +15,6 @@ Cargo.lock
 *.env
 
 # Added by cargo
-
+.fleet/
+.idea/
 /target

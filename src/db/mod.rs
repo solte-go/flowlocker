@@ -1,4 +1,4 @@
-mod repositiry;
+pub mod repository;
 
 use std::sync::Arc;
 use surrealdb::engine::remote::ws::{Client, Ws};
@@ -6,6 +6,8 @@ use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 
 use crate::{Result,error};
+
+#[derive(Clone)]
 pub struct Database {
     pub(crate) conn: Arc<Surreal<Client>>
 }
