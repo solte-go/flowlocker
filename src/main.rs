@@ -4,10 +4,12 @@ mod model;
 mod rest_api;
 mod time;
 
-use std::time::Duration;
+use std::{time::Duration, sync::Arc};
 
 use axum::Router;
+use signal_hook::iterator::Signals;
 use tokio::net::TcpListener;
+use tokio::signal;
 
 pub use self::error::{Error, Result};
 
@@ -17,9 +19,6 @@ pub use self::error::{Error, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    //    let now = UNIX_EPOCH.elapsed().unwrap();
-    //    println!("{:?}", to_u64(now));
-    //    println!("{:?}", to_string_time(to_u64(now)));
 
     let database = db::new().await?;
     database.connect().await?;
@@ -46,32 +45,39 @@ async fn main() -> Result<()> {
             .unwrap();
     });
 
-    println!("waiting 5 seconds");
-    tokio::time::sleep(Duration::from_secs(5)).await;
-
-    println!("telling server to shutdown");
-    _ = close_tx.send(());
-
-    println!("waiting for server to gracefully shutdown");
-    _ = server_handle.await;
-
-
-    // let _pp: Vec<Process> = database
-    //     .conn
-    //     .create("process")
-    //     .content(Process {
-    //         p_id: SUUID::new_v7(),
-    //         name: "test".into(),
-    //         status: OperataionStatus::New,
-    //         create_at: to_u64(UNIX_EPOCH.elapsed().unwrap()),
-    //         complete_at: 0,
-    //         sla: 0, // TODO Default SLA FROM CONFIG
-    //     })
-    //     .await?;
-
     // let process: Vec<Process> = database.conn.select("process").await?;
+//    println!("telling server to shutdown");
+//    _ = close_tx.send(());
+
 
     // println!("{:?}", process);
+    shutdown_signal(close_tx).await;
 
     Ok(())
+}
+
+async fn shutdown_signal(close_tx: tokio::sync::oneshot::Sender<()>) {
+    let ctrl_c = async {
+        _ = close_tx.send(());
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+        println!("Exiting signal recieved")
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
