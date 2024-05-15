@@ -4,10 +4,8 @@ mod model;
 mod rest_api;
 mod time;
 
-use std::{time::Duration, sync::Arc};
-
 use axum::Router;
-use signal_hook::iterator::Signals;
+//use signal_hook::iterator::Signals;
 use tokio::net::TcpListener;
 use tokio::signal;
 
@@ -23,12 +21,12 @@ async fn main() -> Result<()> {
     let database = db::new().await?;
     database.connect().await?;
 
-    let routes_all = Router::new()
-        .merge(rest_api::routes(database));
+//    let routes_all = Router::new()
+//        .merge(rest_api::routes(database));
 
-    let (close_tx, close_rx) = tokio::sync::oneshot::channel();
-
-    let listener = TcpListener::bind("0.0.0.0:8050").await.unwrap();
+//    let (close_tx, close_rx) = tokio::sync::oneshot::channel();
+//
+//    let listener = TcpListener::bind("0.0.0.0:8050").await.unwrap();
 
     // -- without threads --
 
@@ -36,33 +34,19 @@ async fn main() -> Result<()> {
 //        .await
 //        .unwrap();
 
-    let server_handle = tokio::spawn(async {
-        axum::serve(listener, routes_all)
-            .with_graceful_shutdown(async move {
-                _ = close_rx.await;
-            })
-            .await
-            .unwrap();
-    });
+  let _run_axum = tokio::spawn(rest_api::server::new_server(database));
 
-    // let process: Vec<Process> = database.conn.select("process").await?;
-//    println!("telling server to shutdown");
-//    _ = close_tx.send(());
-
-
-    // println!("{:?}", process);
-    shutdown_signal(close_tx).await;
-
+    println!("Lestening for signals");
+    shutdown_signal().await;
     Ok(())
 }
 
-async fn shutdown_signal(close_tx: tokio::sync::oneshot::Sender<()>) {
+async fn shutdown_signal() {
     let ctrl_c = async {
-        _ = close_tx.send(());
         signal::ctrl_c()
             .await
             .expect("failed to install Ctrl+C handler");
-        println!("Exiting signal recieved")
+        println!("\nExiting signal recieved")
     };
 
     #[cfg(unix)]
