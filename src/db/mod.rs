@@ -8,7 +8,7 @@ use surrealdb::Surreal;
 
 use self::error::Result;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Database {
     pub conn: Arc<Surreal<Client>>,
 }

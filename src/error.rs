@@ -1,6 +1,6 @@
 use std::fmt::Formatter;
 use derive_more::From;
-use crate::rest_api;
+use crate::{app_tracing, rest_api};
 use crate::db;
 
 pub type Result<T> = core::result::Result<T, Error>;
@@ -20,6 +20,8 @@ pub enum Error {
 
     #[from]
     DB(db::error::Error),
+    #[from]
+    Tracing(app_tracing::error::Error),
 }
 
 
