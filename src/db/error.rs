@@ -4,6 +4,8 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize, From)]
 pub enum Error {
+    RecordNotFound,
+
     #[from]
     SurrealDB(surrealdb::Error),
 }

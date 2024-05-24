@@ -2,6 +2,7 @@ use std::sync::Arc;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use crate::db;
+use uuid;
 use derive_more::From;
 use serde::Serialize;
 use serde_with::{DisplayFromStr, serde_as};
@@ -13,6 +14,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[serde(tag = "type", content = "data")]
 pub enum Error {
     BadRequest(String),
+    CantParseUUID(String),
 
     #[from]
     DB(db::error::Error),
