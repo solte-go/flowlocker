@@ -18,3 +18,4 @@ Cargo.lock
 .fleet/
 .idea/
 /target
+.vscode/
