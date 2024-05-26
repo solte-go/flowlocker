@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     let _run_axum = tokio::spawn(rest_api::server::new_server(database));
 
     info!("Listening for signals");
-    error!("Listening for signals");
+    
     // println!("Listening for signals");
     shutdown_signal().await;
     Ok(())

@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Uuid as SUUID;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Process {
-    // pub p_id: SUUID,
+    pub app: Cow<'static, str>,
     pub name: Cow<'static, str>,
     pub status: OperationStatus,
     pub create_at: u64,

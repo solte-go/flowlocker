@@ -14,6 +14,13 @@ struct GetProcess {
     id: String
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct NewProcess {
+    app: String,
+    process: String,
+    eta: u64,
+}
+
 pub fn new_routes(db: Database) -> Router {
     Router::new()
     .route("/api/start_new_lock", post(lock_new_process))
@@ -24,8 +31,13 @@ pub fn new_routes(db: Database) -> Router {
 
 async fn lock_new_process(
     State(db): State<Database>,
+    Json(payload): Json<NewProcess>,
 ) -> Result<Json<Value>> {
-    let id = set_new_process(db).await?;
+    info!("Request with data {:?}", payload);
+
+    
+
+    let id = set_new_process(db, payload.app, payload.process, payload.eta).await?;
 
     let body = Json(json!({
         "result": {

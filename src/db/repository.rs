@@ -1,3 +1,4 @@
+use std::process;
 use std::str::FromStr;
 use std::time::UNIX_EPOCH;
 use opentelemetry::KeyValue;
@@ -15,19 +16,19 @@ use crate::time::to_u64;
 use super::error::{Result, Error};
 
 #[instrument]
-pub async fn set_new_process(db: Database) -> Result<String> {
+pub async fn set_new_process(db: Database, app_name: String, process: String, eta: u64) -> Result<String> {
     let new_process_id = Uuid::now_v7().to_string();
 
     let _: Option<Process> = db
         .conn
         .create(("process", &new_process_id))
         .content(Process {
-            // p_id: new_process_id,
-            name: "test".into(),
+            app: app_name.into(),
+            name: process.into(),
             status: OperationStatus::New,
             create_at: to_u64(UNIX_EPOCH.elapsed().unwrap()),
             complete_at: 0,
-            sla: 0, // TODO Default SLA FROM CONFIG
+            sla: eta, // TODO Default SLA FROM CONFIG
         }).await?;
 
         // db.query("CREATE process:john SET name = 'John Doe', age = 25").await?.check()?;
