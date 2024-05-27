@@ -2,9 +2,8 @@ use std::sync::Arc;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use crate::db;
-use uuid;
 use derive_more::From;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
 pub type Result<T> = core::result::Result<T, Error>;
@@ -15,6 +14,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 pub enum Error {
     BadRequest(String),
     CantParseUUID(String),
+    ProcessExist(String),
 
     #[from]
     DB(db::error::Error),
@@ -33,6 +33,29 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+#[derive(Debug, Serialize, strum_macros::AsRefStr)]
+#[serde(tag = "message", content = "detail")]
+pub enum ClientError {
+    Exist,
+    NotExist,
+    ServiceError,
+}
+
+impl Error {
+    pub fn client_status_and_error(&self) -> (StatusCode, ClientError) {
+        match self {
+            Error::ProcessExist { .. } => {
+                (StatusCode::LOCKED, ClientError::Exist)
+            }
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ClientError::ServiceError,
+            ),
+        }
+    }
+}
+
 
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {

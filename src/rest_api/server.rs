@@ -1,4 +1,4 @@
-use axum::Router;
+use axum::{middleware, Router};
 //use signal_hook::iterator::Signals;
 use tokio::net::TcpListener;
 use tracing::info;
@@ -8,10 +8,12 @@ use crate::db::Database;
 
 use super::error::Result;
 use super::routes::new_routes;
+use super::middleware::mw_response_map;
 
 pub async fn new_server(db: Database) -> Result<()> {
     let routes_all = Router::new()
-        .merge(new_routes(db));
+        .merge(new_routes(db))
+        .layer(middleware::map_response(mw_response_map));
 
     //    let (close_tx, close_rx) = tokio::sync::oneshot::channel();
 
