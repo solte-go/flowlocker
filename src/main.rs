@@ -46,7 +46,6 @@ async fn main() -> Result<()> {
 
     info!("Listening for signals");
     
-    // println!("Listening for signals");
     shutdown_signal().await;
     Ok(())
 }
