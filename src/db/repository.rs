@@ -11,7 +11,7 @@ use tracing::{info, instrument};
 use crate::app_tracing::get_global_trace;
 
 use crate::db::Database;
-use crate::model::{OperationStatus, Process};
+use crate::models::{OperationStatus, Process};
 use crate::time::to_u64;
 
 use super::error::{Result, Error};

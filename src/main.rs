@@ -1,6 +1,6 @@
 mod db;
 mod error;
-mod model;
+mod models;
 mod rest_api;
 mod time;
 mod app_tracing;
@@ -20,18 +20,23 @@ pub use self::error::{Error, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (non_blocking_writer, _guard) = tracing_appender::non_blocking(std::io::stdout());
-    let bunyan_formatting_layer =
-        BunyanFormattingLayer::new("flowlocker".to_string(), non_blocking_writer);
-
-    let subscriber = Registry::default()
-        .with(EnvFilter::from_default_env())
-        .with(JsonStorageLayer)
-        .with(bunyan_formatting_layer);
-
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+    // let (non_blocking_writer, _guard) = tracing_appender::non_blocking(std::io::stdout());
+    // let bunyan_formatting_layer =
+    //     BunyanFormattingLayer::new("flowlocker".to_string(), non_blocking_writer);
+    // 
+    // let subscriber = Registry::default()
+    //     .with(EnvFilter::from_default_env())
+    //     .with(JsonStorageLayer);
+    // 
+    // tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let _ = app_tracing::init_opentelemetry("flowlocker".to_string())?;
+
+    tracing_subscriber::fmt()
+        .with_target(true)
+        .with_env_filter(EnvFilter::from_default_env())
+        .json()
+        .init();
 
     // tracing_subscriber::fmt()
     //     .with_target(false)
@@ -45,7 +50,7 @@ async fn main() -> Result<()> {
     let _run_axum = tokio::spawn(rest_api::server::new_server(database));
 
     info!("Listening for signals");
-    
+
     shutdown_signal().await;
     Ok(())
 }
