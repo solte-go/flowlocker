@@ -1,0 +1,47 @@
+[package]
+name = "flowlocker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# -- App Libs
+lib-utils = { path = "../../libs/lib-utils" }
+lib-core = { path = "../../libs/lib-core" }
+
+derive_more = { version = "1.0.0-beta.6", features = ["from"] }
+surrealdb-beta = { version = "1.4.0", features = ["kv-mem"] }
+once_cell = "1.19.0"
+tokio = { version = "1.0.0", features = ["rt", "rt-multi-thread", "macros", "signal"] }
+uuid = { version = "1.8.0", features = ["v7"] }
+
+chrono = "0.4.38"
+
+# -- REST --
+axum = { version = "0.7.5", features = ["macros"] }
+axum-extra = "0.9.3"
+
+# -- JSON
+serde = { version = "1.0.200", features = ["derive"] }
+serde_json = "1.0.116"
+serde_with = "3"
+strum_macros = "0.25"
+
+# -- UTULITY --
+signal-hook = { version = "0.1.6", features = ["tokio-support"] }
+
+# -- TRACING --
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2.3"
+tracing-bunyan-formatter = "0.3.9"
+#opentelemetry-jaeger = { version = "0.20.0", features = ["rt-tokio"] }
+
+log = "0.4.21"
+opentelemetry = { version = "0.23.0", features = ["logs"] }
+opentelemetry_sdk = { version = "0.23.0", features = ["rt-tokio", "logs"] }
+opentelemetry-stdout = { version = "0.4.0", features = ["logs"] }
+opentelemetry-semantic-conventions = { version = "0.15.0" }
+opentelemetry-otlp = { version = "0.16.0", features = ["http-proto", "reqwest-client", "logs"] }
+opentelemetry-appender-log = { version = "0.4.0", default-features = false }

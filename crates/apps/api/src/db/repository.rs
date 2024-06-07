@@ -3,12 +3,13 @@ use std::process;
 use std::str::FromStr;
 use std::time::UNIX_EPOCH;
 use opentelemetry::KeyValue;
+use opentelemetry::Context;
 use opentelemetry::trace::{Span, Status, Tracer};
 
 use surrealdb::sql::Uuid as SUUID;
 use uuid::{self, Uuid};
-use tracing::{info, instrument};
-use crate::app_tracing::get_global_trace;
+use tracing::{info, instrument, span};
+use lib_core::tracing::get_global_trace;
 
 use crate::db::Database;
 use crate::models::{OperationStatus, Process};
@@ -74,16 +75,23 @@ pub async fn get_process_by_id(db: &Database, id: &str) -> Result<Process> {
 }
 
 pub async fn check_running_processes(
+    span_ctx: &Context,
     db: &Database,
     app: &str,
     process_name: &str,
 ) -> Result<Option<Vec<Process>>> {
+    println!("{:?}{:?}", app, process_name);
+
+    let tracer = get_global_trace("flowlocker".to_string());
+    tracer.start_with_context("check_running_processes", span_ctx);
+
     let mut response: surrealdb::Response = db.conn
         .query("SELECT * FROM type::table($table) WHERE app = $app AND process_name = $process_name")
         .bind(("table", "process"))
         .bind(("app", app))
         .bind(("process_name", process_name))
         .await?;
+
 
     let processes: Vec<Process> = response.take(0)?;
     if processes.is_empty() {

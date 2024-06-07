@@ -1,4 +1,5 @@
 [env]
 
-# Scope down app_tracing, to filter out external lib app_tracing.
+# Scope down tracing, to filter out external lib tracing.
 RUST_LOG = "flowlocker=debug"
+ENV = "dev"

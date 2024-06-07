@@ -3,15 +3,16 @@ mod error;
 mod models;
 mod rest_api;
 mod time;
-mod app_tracing;
 
 use tokio::signal;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
-use tracing::{error, info};
-use tracing_subscriber::layer::SubscriberExt;
+// use tracing::{error, info};
+use lib_utils::env::{get_env};
+use lib_core::tracing;
+
 use tracing_subscriber::{EnvFilter, Registry};
 
-
+use log::{info, warn};
 pub use self::error::{Error, Result};
 
 //use surrealdb::engine::local::Mem; uncomment after moving to in memory DB
@@ -20,6 +21,29 @@ pub use self::error::{Error, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // let exporter = opentelemetry_stdout::LogExporterBuilder::default()
+    //     // uncomment the below lines to pretty print output.
+    //     // .with_encoder(|writer, data|
+    //     //     {
+    //     //         serde_json::to_writer_pretty(writer, &data).unwrap();
+    //     //         Ok(())
+    //     //     })
+    //     .build();
+    // let logger_provider = LoggerProvider::builder()
+    //     .with_config(config()
+    //         .with_resource(Resource::new(vec![KeyValue::new(
+    //             SERVICE_NAME,
+    //             "flowlocker",
+    //         )])))
+    //     .with_simple_exporter(exporter)
+    //     .build();
+
+    // Setup Log Appender for the log crate.
+    // let otel_log_appender = OpenTelemetryLogBridge::new(&logger_provider);
+    // log::set_boxed_logger(Box::new(otel_log_appender)).unwrap();
+    // log::set_max_level(Level::Debug.to_level_filter());
+
+
     // let (non_blocking_writer, _guard) = tracing_appender::non_blocking(std::io::stdout());
     // let bunyan_formatting_layer =
     //     BunyanFormattingLayer::new("flowlocker".to_string(), non_blocking_writer);
@@ -30,19 +54,27 @@ async fn main() -> Result<()> {
     // 
     // tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let _ = app_tracing::init_opentelemetry("flowlocker".to_string())?;
+    let _ = tracing::init_opentelemetry("flowlocker".to_string())?;
+    //
+    // tracing_subscriber::fmt()
+    //     .with_target(true)
+    //     .with_env_filter(EnvFilter::from_default_env())
+    //     .json()
+    //     .init();
 
     tracing_subscriber::fmt()
-        .with_target(true)
+        .with_target(false)
         .with_env_filter(EnvFilter::from_default_env())
         .json()
         .init();
 
-    // tracing_subscriber::fmt()
-    //     .with_target(false)
-    //     .with_env_filter(EnvFilter::from_default_env())
-    //     .json()
-    //     .init();
+    // -- FOR DEV ONLY
+    let env = get_env("ENV")?;
+    if env == "dev" {
+        warn!("!!LOADING-DEV!! - development environment has been loaded");
+        // All required dev setup goes here
+    }
+
 
     let database = db::new().await?;
     database.connect().await?;
