@@ -7,7 +7,6 @@ pub enum Error {
     CtxCannotNewRootCtx,
 }
 
-// region: --- Error Boilerplate
 impl core::fmt::Display for Error {
     fn fmt(
         &self,

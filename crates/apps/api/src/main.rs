@@ -10,9 +10,13 @@ use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use lib_utils::env::{get_env};
 use lib_core::tracing;
 
-use tracing_subscriber::{EnvFilter, Registry};
+use tracing_subscriber::{EnvFilter};
 
 use log::{info, warn};
+use tracing_error::ErrorLayer;
+
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 pub use self::error::{Error, Result};
 
 //use surrealdb::engine::local::Mem; uncomment after moving to in memory DB
@@ -54,19 +58,31 @@ async fn main() -> Result<()> {
     // 
     // tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let _ = tracing::init_opentelemetry("flowlocker".to_string())?;
+    let tracer = tracing::init_opentelemetry("flowlocker".to_string())?;
     //
     // tracing_subscriber::fmt()
     //     .with_target(true)
     //     .with_env_filter(EnvFilter::from_default_env())
     //     .json()
     //     .init();
+    let subscriber = tracing_subscriber::fmt::layer().json();
+    let tracer = tracing_opentelemetry::layer().with_tracer(tracer);
 
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .with_env_filter(EnvFilter::from_default_env())
-        .json()
+    // let level = EnvFilter::from_default_env();
+
+    tracing_subscriber::registry()
+        .with(subscriber)
+        .with(EnvFilter::from_default_env())
+        .with(tracer)
+        .with(ErrorLayer::default())
         .init();
+
+
+    // tracing_subscriber::fmt()
+    //     .with_target(false)
+    //     .with_env_filter(EnvFilter::from_default_env())
+    //     .json()
+    //     .init();
 
     // -- FOR DEV ONLY
     let env = get_env("ENV")?;
@@ -74,7 +90,6 @@ async fn main() -> Result<()> {
         warn!("!!LOADING-DEV!! - development environment has been loaded");
         // All required dev setup goes here
     }
-
 
     let database = db::new().await?;
     database.connect().await?;

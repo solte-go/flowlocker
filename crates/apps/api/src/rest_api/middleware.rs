@@ -1,19 +1,17 @@
 use std::sync::Arc;
 use axum::body::Body;
-use axum::extract::{FromRequestParts, State};
+use axum::extract::{FromRequestParts};
 
 use axum::http::{Method, Request, Uri};
 use axum::http::request::Parts;
 use axum::{async_trait, Json};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use opentelemetry::Context;
 
-use opentelemetry::trace::{TraceContextExt, Tracer};
-// use opentelemetry_sdk::trace::Tracer;
 use serde::Serialize;
 use serde_json::{json, to_value};
-use tracing::{debug, info, Instrument};
+use tracing::{debug, info};
+use tracing_error::SpanTrace;
 
 
 use super::error::{ApiError, Error};
@@ -27,20 +25,14 @@ pub async fn mw_ctx_resolver(
 ) -> Result<Response> {
     debug!("{:<12} - mw_ctx_resolver", "MIDDLEWARE");
 
-    let request_ctx = _ctx_resolve(req.uri_mut().to_string()).await;
+    let request_ctx = _ctx_resolve().await;
     req.extensions_mut().insert(request_ctx);
 
     Ok(next.run(req).await)
 }
 
-async fn _ctx_resolve(path: String) -> CtxExtResult {
-    // -- Create CtxResult
-
-    let tracer = get_global_trace("flowlocker".to_string());
-    let span = tracer.start(path);
-    let cx = Context::current_with_span(span);
-
-    let ctx = Ctx::new_with_span(cx);
+async fn _ctx_resolve() -> CtxExtResult {
+    let ctx = Ctx::default();
     info!("New id: {:?}", &ctx.get_request_id());
     Ok(CtxW(ctx))
 }

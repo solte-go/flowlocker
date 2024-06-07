@@ -3,12 +3,14 @@ use std::sync::Arc;
 use axum::{extract::{State, Path, Json}, routing::{post, get}, Router};
 use axum::extract::FromRequest;
 use axum::response::{IntoResponse, Response};
-use opentelemetry::trace::{Span, Status, Tracer};
+use opentelemetry::trace::{FutureExt, Span, Status, Tracer};
 use serde::{Deserialize, Serialize};
 
 use crate::db::Database;
 use serde_json::{json, Value};
-use tracing::{error, info};
+use tracing::{error, info, instrument, span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tracing_error::{SpanTrace};
 use uuid::Uuid;
 use lib_core::ctx::Ctx;
 use lib_core::tracing::get_global_trace;
@@ -63,24 +65,25 @@ pub fn routes(db: Database) -> Router {
 
 async fn lock_new_process_handler(
     State(db): State<Database>,
-    ctx: CtxW,
+    // ctx: CtxW,
     AppJson(payload): AppJson<NewProcess>,
     // Json(payload): Json<NewProcess>,
 ) -> Response {
-    let ctx = ctx.0;
+    // let ctx = ctx.0;
 
-    let mut res = _lock_new_process(ctx, db, payload).await.into_response();
+    let mut res = _lock_new_process(db, payload).await.into_response();
     res.extensions_mut().insert(Arc::new(RequestEndpoint::StartNewLock));
 
     res
 }
 
+#[instrument]
 async fn get_locked_process(
     State(db): State<Database>,
-    ctx: CtxW,
+    // ctx: CtxW,
     Path(lock_id): Path<Uuid>,
 ) -> Response {
-    let ctx = ctx.0;
+    // let ctx = ctx.0;
 
     let mut res = _get_locked_process(db, lock_id).await.into_response();
     res.extensions_mut().insert(Arc::new(RequestEndpoint::GetLockedProcess));
@@ -88,26 +91,24 @@ async fn get_locked_process(
     res
 }
 
+#[instrument]
 async fn _lock_new_process(
-    mut ctx: Ctx,
+    // ctx: Ctx,
     db: Database,
     payload: NewProcess,
 ) -> Result<Json<Value>> {
-    info!("Request with data {:?}", payload);
+    // info!("Request with data {:?}", payload);
 
-    let span_ctx = ctx.get_request_span();
-    let mut span = get_global_trace("flowlocker".to_string())
-        .start_with_context("lock_new_process", span_ctx);
-
-
-    let running_processes = match check_running_processes(span_ctx, &db, &payload.app, &payload.process).await {
+    let running_processes = match check_running_processes(&db, &payload.app, &payload.process).await {
         Ok(ok) => ok,
         Err(e) => return Err(ApiError::BadRequest(e.to_string())),
     };
 
     if let Some(processes) = running_processes {
         if !processes.is_empty() {
-            span.set_status(Status::Error { description: Cow::from("Process already exists".to_string()) });
+            let span = tracing::Span::current();
+            error!(parent: &span, error = %"Process already exists".to_string());
+
             return Err(ApiError::ProcessExist("Process already exists".to_string()));
         }
     }
@@ -124,7 +125,7 @@ async fn _lock_new_process(
         }
     }));
 
-    span.set_status(Status::Ok);
+    // span.set_status(Status::Ok);
 
     Ok(body)
 }

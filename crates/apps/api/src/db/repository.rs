@@ -74,17 +74,21 @@ pub async fn get_process_by_id(db: &Database, id: &str) -> Result<Process> {
     Ok(result.unwrap())
 }
 
+#[instrument]
 pub async fn check_running_processes(
-    span_ctx: &Context,
     db: &Database,
     app: &str,
     process_name: &str,
 ) -> Result<Option<Vec<Process>>> {
     println!("{:?}{:?}", app, process_name);
 
-    let tracer = get_global_trace("flowlocker".to_string());
-    tracer.start_with_context("check_running_processes", span_ctx);
 
+    //TODO move to Tracing package
+    // let tracer = get_global_trace("flowlocker".to_string());
+    // tracer.start_with_context("check_running_processes", span_ctx);
+
+
+    //TODO Create query separately for tracing and logging
     let mut response: surrealdb::Response = db.conn
         .query("SELECT * FROM type::table($table) WHERE app = $app AND process_name = $process_name")
         .bind(("table", "process"))
@@ -98,7 +102,7 @@ pub async fn check_running_processes(
         return Ok(None);
     }
 
-    info!("Get_process_by_id result: {:?}", processes);
+    // info!("Get_process_by_id result: {:?}", processes);
 
     Ok(Some(processes))
 }

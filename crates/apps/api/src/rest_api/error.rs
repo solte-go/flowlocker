@@ -1,9 +1,11 @@
+use std::fmt;
 use axum::extract::rejection::JsonRejection;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use derive_more::From;
 use serde::Serialize;
 use serde_with::{DisplayFromStr, serde_as};
+use tracing_error::SpanTrace;
 
 use crate::db;
 use crate::rest_api::middleware;
@@ -15,7 +17,6 @@ pub type Result<T> = core::result::Result<T, ApiError>;
 pub enum ApiError {
     JsonExtractorRejection(JsonRejection),
     BadRequest(String),
-    CantParseUUID(String),
     ProcessExist(String),
     CtxExt(middleware::CtxExtError),
 }
@@ -44,12 +45,6 @@ impl std::fmt::Display for Error {
         write!(f, "{self:?}")
     }
 }
-
-// impl From<ApiError> for Error {
-//     fn from(_: ApiError) -> Self {
-//         Self::ApiError
-//     }
-// }
 
 impl std::error::Error for Error {}
 
