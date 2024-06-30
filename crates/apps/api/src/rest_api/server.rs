@@ -8,12 +8,13 @@ use crate::db::Database;
 
 use super::error::Result;
 use super::routes::routes;
-use super::middleware::{mw_response_map, mw_ctx_resolver};
+use super::middleware::{mw_response_map, mw_ctx_resolver, log_result};
 
 pub async fn new_server(db: Database) -> Result<()> {
     let routes_all = Router::new()
         .merge(routes(db.clone()))
         .layer(middleware::map_response(mw_response_map))
+        .layer(middleware::from_fn(log_result))
         .layer(middleware::from_fn(mw_ctx_resolver));
 
     //    let (close_tx, close_rx) = tokio::sync::oneshot::channel();

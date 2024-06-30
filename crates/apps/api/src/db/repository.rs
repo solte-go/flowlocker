@@ -5,6 +5,7 @@ use std::time::UNIX_EPOCH;
 use opentelemetry::KeyValue;
 use opentelemetry::Context;
 use opentelemetry::trace::{Span, Status, Tracer};
+use serde::{Deserialize, Serialize};
 
 use surrealdb::sql::Uuid as SUUID;
 use uuid::{self, Uuid};
@@ -17,8 +18,15 @@ use crate::time::to_u64;
 
 use super::error::{Result, Error};
 
+
+#[derive(Serialize, Deserialize, Debug)]
+struct UpdateProcess {
+    status: OperationStatus,
+    updated_at: u64,
+}
+
 #[instrument]
-pub async fn set_new_process(db: &Database, app_name: String, process: String, eta: u64) -> Result<String> {
+pub async fn create_new_process(db: &Database, app_name: String, process: String, eta: u64) -> Result<String> {
     let new_process_id = Uuid::now_v7().to_string();
 
     let _: Option<Process> = db
@@ -29,6 +37,7 @@ pub async fn set_new_process(db: &Database, app_name: String, process: String, e
             process_name: process.into(),
             status: OperationStatus::New,
             create_at: to_u64(UNIX_EPOCH.elapsed().unwrap()),
+            updated_at: to_u64(UNIX_EPOCH.elapsed().unwrap()),
             complete_at: 0,
             sla: eta, // TODO Default SLA FROM CONFIG
         }).await?;
@@ -45,6 +54,16 @@ pub async fn set_new_process(db: &Database, app_name: String, process: String, e
 
 
     Ok(new_process_id)
+}
+
+pub async fn update_process_status(db: &Database, id: String, status: OperationStatus) -> Result<()> {
+    let _: Option<Process> = db.conn.update(("process", id))
+        .merge(UpdateProcess {
+            status,
+            updated_at: to_u64(UNIX_EPOCH.elapsed().unwrap()),
+        }).await?;
+
+    Ok(())
 }
 
 #[instrument(skip(db))]

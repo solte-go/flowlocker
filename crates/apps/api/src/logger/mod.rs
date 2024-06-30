@@ -1,0 +1,1 @@
+fn logger_middleware() {}

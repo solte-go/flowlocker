@@ -1,23 +1,22 @@
-use std::borrow::Cow;
 use std::sync::Arc;
 use axum::{extract::{State, Path, Json}, routing::{post, get}, Router};
 use axum::extract::FromRequest;
 use axum::response::{IntoResponse, Response};
-use opentelemetry::trace::{FutureExt, Span, Status, Tracer};
+use opentelemetry::trace::{Span, Status};
 use serde::{Deserialize, Serialize};
 
 use crate::db::Database;
 use serde_json::{json, Value};
 use tracing::{error, info, instrument, span};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
-use tracing_error::{SpanTrace};
-use uuid::Uuid;
-use lib_core::ctx::Ctx;
-use lib_core::tracing::get_global_trace;
 
-use crate::db::repository::{set_new_process, get_process_by_id, check_running_processes};
-use crate::rest_api::middleware::CtxW;
-use super::error::{Result, ApiError};
+
+use uuid::Uuid;
+
+
+use crate::db::repository::{update_process_status, get_process_by_id, check_running_processes, create_new_process};
+use crate::models::OperationStatus;
+
+use super::error::{Result, ApiError, ErrorType};
 
 
 // Create our own JSON extractor by wrapping `axum::Json`. This makes it easy to override the
@@ -29,8 +28,8 @@ use super::error::{Result, ApiError};
 pub struct AppJson<T>(pub T);
 
 impl<T> IntoResponse for AppJson<T>
-    where
-        axum::Json<T>: IntoResponse,
+where
+    axum::Json<T>: IntoResponse,
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()
@@ -51,6 +50,12 @@ struct NewProcess {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct UpdateProcess {
+    process_id: Uuid,
+    status: OperationStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum RequestEndpoint {
     StartNewLock,
     GetLockedProcess,
@@ -58,12 +63,13 @@ pub enum RequestEndpoint {
 
 pub fn routes(db: Database) -> Router {
     Router::new()
-        .route("/api/start_new_lock", post(lock_new_process_handler))
-        .route("/api/get_locked_process/:lock_id", post(get_locked_process))
+        .route("/api/start_new_lock", post(handle_create_new_lock))
+        .route("/api/get_locked_process/:lock_id", get(handle_get_locked_process))
+        .route("/api/update_process_status", post(handle_update_process_status))
         .with_state(db)
 }
 
-async fn lock_new_process_handler(
+async fn handle_create_new_lock(
     State(db): State<Database>,
     // ctx: CtxW,
     AppJson(payload): AppJson<NewProcess>,
@@ -71,14 +77,14 @@ async fn lock_new_process_handler(
 ) -> Response {
     // let ctx = ctx.0;
 
-    let mut res = _lock_new_process(db, payload).await.into_response();
+    let mut res = _create_new_lock(db, payload).await.into_response();
     res.extensions_mut().insert(Arc::new(RequestEndpoint::StartNewLock));
 
     res
 }
 
 #[instrument]
-async fn get_locked_process(
+async fn handle_get_locked_process(
     State(db): State<Database>,
     // ctx: CtxW,
     Path(lock_id): Path<Uuid>,
@@ -91,8 +97,35 @@ async fn get_locked_process(
     res
 }
 
+async fn handle_update_process_status(
+    State(db): State<Database>,
+    AppJson(payload): AppJson<UpdateProcess>,
+) -> Response {
+    //TODO process logic. Can't change process from 
+    _update_process_status(db, payload).await.into_response()
+}
+
+async fn _update_process_status(
+    db: Database,
+    payload: UpdateProcess,
+) -> Result<Json<Value>> {
+    match update_process_status(&db, payload.process_id.to_string(), payload.status).await {
+        Ok(ok) => ok,
+        Err(e) => return Err(ApiError::BadRequest(e.to_string())),
+    };
+
+    let body = Json(json!({
+        "result": {
+            "success": true,
+        }
+    }));
+
+    Ok(body)
+}
+
+
 #[instrument]
-async fn _lock_new_process(
+async fn _create_new_lock(
     // ctx: Ctx,
     db: Database,
     payload: NewProcess,
@@ -106,14 +139,11 @@ async fn _lock_new_process(
 
     if let Some(processes) = running_processes {
         if !processes.is_empty() {
-            let span = tracing::Span::current();
-            error!(parent: &span, error = %"Process already exists".to_string());
-
-            return Err(ApiError::ProcessExist("Process already exists".to_string()));
+            return Err(ApiError::from((ErrorType::ProcessExist, String::from("Process already exists"))));
         }
     }
 
-    let id = match set_new_process(&db, payload.app, payload.process, payload.eta).await {
+    let id = match create_new_process(&db, payload.app, payload.process, payload.eta).await {
         Ok(ok) => ok,
         Err(e) => return Err(ApiError::BadRequest(e.to_string())),
     };
@@ -124,8 +154,6 @@ async fn _lock_new_process(
             "id": id,
         }
     }));
-
-    // span.set_status(Status::Ok);
 
     Ok(body)
 }
@@ -149,7 +177,7 @@ async fn _get_locked_process(
         Ok(p) => {
             let body = Json(json!({
                 "result": {
-                    "success": p,
+                    "success": p.to_response(),
                     "id": lock_id,
                 }
             }));

@@ -3,6 +3,7 @@ mod error;
 mod models;
 mod rest_api;
 mod time;
+mod logger;
 
 use tokio::signal;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};

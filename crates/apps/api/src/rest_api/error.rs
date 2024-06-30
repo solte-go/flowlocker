@@ -5,7 +5,7 @@ use axum::response::IntoResponse;
 use derive_more::From;
 use serde::Serialize;
 use serde_with::{DisplayFromStr, serde_as};
-use tracing_error::SpanTrace;
+use tracing::error;
 
 use crate::db;
 use crate::rest_api::middleware;
@@ -19,8 +19,31 @@ pub enum ApiError {
     BadRequest(String),
     ProcessExist(String),
     CtxExt(middleware::CtxExtError),
+    ReqParts(middleware::RequestInfoError),
 }
 
+#[derive(Debug)]
+pub(super) enum ErrorType {
+    ProcessExist
+}
+
+impl From<(ErrorType, String)> for ApiError {
+    fn from(err: (ErrorType, String)) -> Self {
+        Self::log_error(&err.0, &err.1);
+        match err.0 {
+            ErrorType::ProcessExist => {
+                ApiError::ProcessExist(err.1)
+            }
+        }
+    }
+}
+
+impl ApiError {
+    fn log_error(err: &ErrorType, message: &str) {
+        let span = tracing::Span::current();
+        error!(parent: &span, error_type = ?err, error_message = %message);
+    }
+}
 
 #[serde_as]
 #[derive(Debug, Serialize, From, strum_macros::AsRefStr)]
@@ -81,6 +104,7 @@ impl IntoResponse for ApiError {
         let (status, message) = match self {
             ApiError::JsonExtractorRejection(rejection) => {
                 // This error is caused by bad user input so don't log it
+
                 (rejection.status(), rejection.body_text())
             }
             // AppError::TimeError(err) => {
