@@ -1,9 +1,12 @@
 use std::borrow::Cow;
+use std::cmp::PartialEq;
+
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, NaiveDateTime, Utc};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Process {
+    pub process_id: Cow<'static, str>,
     pub app: Cow<'static, str>,
     pub process_name: Cow<'static, str>,
     pub status: OperationStatus,
@@ -15,6 +18,7 @@ pub struct Process {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResponseProcess {
+    pub process_id: Cow<'static, str>,
     pub app: Cow<'static, str>,
     pub process_name: Cow<'static, str>,
     pub status: OperationStatus,
@@ -27,12 +31,13 @@ pub struct ResponseProcess {
 impl Process {
     pub fn to_response(&self) -> ResponseProcess {
         ResponseProcess {
+            process_id: self.process_id.clone(),
             app: self.app.clone(),
             process_name: self.process_name.clone(),
             status: self.status.clone(),
-            create_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.create_at as i64, 0), Utc),
-            updated_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.updated_at as i64, 0), Utc),
-            complete_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.complete_at as i64, 0), Utc),
+            create_at: DateTime::from_timestamp(self.create_at as i64, 0).unwrap_or_default(),
+            updated_at: DateTime::from_timestamp(self.updated_at as i64, 0).unwrap_or_default(),
+            complete_at: DateTime::from_timestamp(self.complete_at as i64, 0).unwrap_or_default(),
             sla: self.sla,
         }
     }
@@ -45,4 +50,30 @@ pub enum OperationStatus {
     InProgress,
     Completed,
     Staled,
+}
+
+impl PartialEq<OperationStatus> for &OperationStatus {
+    fn eq(&self, other: &OperationStatus) -> bool {
+        todo!()
+    }
+}
+
+impl OperationStatus {
+    pub fn is_staled(&self) -> bool {
+        if self.to_string() == OperationStatus::Staled.to_string() {
+            return true;
+        }
+        false
+    }
+}
+
+impl std::fmt::Display for OperationStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OperationStatus::New => write!(f, "New"),
+            OperationStatus::InProgress => write!(f, "InProgress"),
+            OperationStatus::Completed => write!(f, "Completed"),
+            OperationStatus::Staled => write!(f, "Staled"),
+        }
+    }
 }

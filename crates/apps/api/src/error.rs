@@ -1,6 +1,6 @@
 use std::fmt::Formatter;
 use derive_more::From;
-use crate::rest_api;
+use crate::{rest_api, time};
 use lib_core::tracing;
 use crate::db;
 
@@ -28,6 +28,9 @@ pub enum Error {
 
     #[from]
     Tracing(tracing::error::Error),
+
+    #[from]
+    Scheduler(super::scheduler::error::Error),
 }
 
 

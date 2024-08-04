@@ -1,23 +1,21 @@
-use std::sync::Arc;
 use axum::body::Body;
-use axum::extract::{FromRequestParts};
+use axum::extract::FromRequestParts;
+use std::sync::Arc;
 
-use axum::http::{Method, Request, Uri};
 use axum::http::request::Parts;
-use axum::{async_trait, Json};
+use axum::http::{Method, Request, Uri};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
+use axum::{async_trait, Json};
 use http::StatusCode;
-
 
 use serde::Serialize;
 use serde_json::{json, to_value};
 use tracing::{debug, info};
 use uuid::Uuid;
 
-
+use super::error::Result;
 use super::error::{ApiError, Error};
-use super::error::{Result};
 use lib_core::ctx::Ctx;
 
 #[derive(Debug, Clone)]
@@ -33,10 +31,7 @@ pub enum RequestInfoError {
     RequestCantProcessParts,
 }
 
-pub async fn mw_ctx_resolver(
-    mut req: Request<Body>,
-    next: Next,
-) -> Result<Response> {
+pub async fn mw_ctx_resolver(mut req: Request<Body>, next: Next) -> Result<Response> {
     debug!("{:<12} - mw_ctx_resolver", "MIDDLEWARE");
 
     let request_ctx = _ctx_resolve().await;
@@ -66,19 +61,23 @@ pub async fn mw_ctx_resolver(
     Ok(res)
 }
 
-pub async fn log_result(
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response> {
-    let req_info = req.extensions().get::<Arc<RequestInfo>>().map(Arc::as_ref)
-        .ok_or(ApiError::ReqParts(RequestInfoError::RequestCantProcessParts))?;
+pub async fn log_result(req: Request<Body>, next: Next) -> Result<Response> {
+    let req_info = req
+        .extensions()
+        .get::<Arc<RequestInfo>>()
+        .map(Arc::as_ref)
+        .ok_or(ApiError::ReqParts(
+            RequestInfoError::RequestCantProcessParts,
+        ))?;
     let id = req_info.id;
 
-    info!("event: request_started, id: {:?} path: {:?}", id, req_info.path);
+    info!(
+        "event: request_started, id: {:?} path: {:?}",
+        id, req_info.path
+    );
 
     Ok(next.run(req).await)
 }
-
 
 async fn _ctx_resolve() -> CtxExtResult {
     let ctx = Ctx::default();
@@ -86,7 +85,6 @@ async fn _ctx_resolve() -> CtxExtResult {
     info!("New id: {:?}", &ctx.get_request_id());
     Ok(CtxW(ctx))
 }
-
 
 pub async fn mw_response_map(
     ctx: Option<CtxW>,
@@ -104,36 +102,41 @@ pub async fn mw_response_map(
     let client_status_error = web_error.map(|se| se.client_status_and_error());
 
     // -- If client error, build the new response.
-    let error_response =
-        client_status_error
-            .as_ref()
-            .map(|(status_code, client_error)| {
-                let client_error = to_value(client_error).ok();
-                let message = client_error.as_ref().and_then(|v| v.get("message"));
-                let detail = client_error.as_ref().and_then(|v| v.get("detail"));
+    let error_response = client_status_error
+        .as_ref()
+        .map(|(status_code, client_error)| {
+            let client_error = to_value(client_error).ok();
+            let message = client_error.as_ref().and_then(|v| v.get("message"));
+            let detail = client_error.as_ref().and_then(|v| v.get("detail"));
 
-                let client_error_body = json!({
-					// "id": rpc_info.as_ref().map(|rpc| rpc.id.clone()),
-					"error": {
-						"message": message,
-						"data": {
-							// "req_uuid": uuid.to_string(),
-							"detail": detail
-						}
-					}
-				});
-
-                debug!("CLIENT ERROR BODY: {client_error_body}");
-
-                // Build the new response from the client_error_body
-                (*status_code, Json(client_error_body)).into_response()
+            let client_error_body = json!({
+                // "id": rpc_info.as_ref().map(|rpc| rpc.id.clone()),
+                "error": {
+                    "message": message,
+                    "data": {
+                        // "req_uuid": uuid.to_string(),
+                        "detail": detail
+                    }
+                }
             });
+
+            debug!("CLIENT ERROR BODY: {client_error_body}");
+
+            // Build the new response from the client_error_body
+            (*status_code, Json(client_error_body)).into_response()
+        });
 
     // -- Build and log the server log line.
     let _client_error = client_status_error.unzip().1;
     // TODO: Need to handler if log_request fail (but should not fail request)
 
-    info!("event: request_completed, id: {:?}, path: {:?}, method: {:?}, status code: {:?}",  ctx.get_request_id(), uri, req_method, res.status());
+    info!(
+        "event: request_completed, id: {:?}, path: {:?}, method: {:?}, status code: {:?}",
+        ctx.get_request_id(),
+        uri,
+        req_method,
+        res.status()
+    );
     // let _ = log_request(
     //     uuid,
     //     req_method,
@@ -175,7 +178,9 @@ impl<S: Send + Sync> FromRequestParts<S> for RequestInfo {
         let p = parts
             .extensions
             .get::<RequestInfo>()
-            .ok_or(ApiError::ReqParts(RequestInfoError::RequestCantProcessParts))?
+            .ok_or(ApiError::ReqParts(
+                RequestInfoError::RequestCantProcessParts,
+            ))?
             .clone();
         Ok(p)
     }

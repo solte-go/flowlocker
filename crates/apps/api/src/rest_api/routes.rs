@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 use axum::{extract::{State, Path, Json}, routing::{post, get}, Router};
 use axum::extract::FromRequest;
 use axum::response::{IntoResponse, Response};
@@ -46,8 +47,20 @@ struct GetProcess {
 struct NewProcess {
     app: String,
     process: String,
-    eta: u64,
+    eta: String,
 }
+
+impl NewProcess {
+    fn eta_to_u64(&self) -> Result<u64> {
+        string_to_duration(self.eta.as_str())
+    }
+}
+
+fn string_to_duration(s: &str) -> Result<u64> {
+    let res = s.trim_end_matches('s').parse::<u64>().map_err(|_| ApiError::BadRequest("Invalid ETA format".to_string()))?;
+    Ok(res)
+}
+
 
 #[derive(Debug, Serialize, Deserialize)]
 struct UpdateProcess {
@@ -109,6 +122,18 @@ async fn _update_process_status(
     db: Database,
     payload: UpdateProcess,
 ) -> Result<Json<Value>> {
+    let p = match get_process_by_id(&db, payload.process_id.to_string().as_str()).await {
+        Ok(p) => {
+            if p.status.is_staled() {
+                return Err(ApiError::BadRequest("can't updated Staled process".to_string()));
+            } else {
+                p
+            }
+        }
+        Err(e) => return Err(ApiError::BadRequest(e.to_string())),
+    };
+
+
     match update_process_status(&db, payload.process_id.to_string(), payload.status).await {
         Ok(ok) => ok,
         Err(e) => return Err(ApiError::BadRequest(e.to_string())),
@@ -143,7 +168,11 @@ async fn _create_new_lock(
         }
     }
 
-    let id = match create_new_process(&db, payload.app, payload.process, payload.eta).await {
+    let etc = payload.eta_to_u64()?;
+
+    println!("{:?}", etc);
+
+    let id = match create_new_process(&db, payload.app, payload.process, etc).await {
         Ok(ok) => ok,
         Err(e) => return Err(ApiError::BadRequest(e.to_string())),
     };

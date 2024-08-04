@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::process;
-use std::str::FromStr;
+
 use std::time::UNIX_EPOCH;
 use opentelemetry::KeyValue;
 use opentelemetry::Context;
@@ -14,7 +14,7 @@ use lib_core::tracing::get_global_trace;
 
 use crate::db::Database;
 use crate::models::{OperationStatus, Process};
-use crate::time::to_u64;
+use crate::time::{to_u64, from_epoch};
 
 use super::error::{Result, Error};
 
@@ -25,33 +25,28 @@ struct UpdateProcess {
     updated_at: u64,
 }
 
-#[instrument]
 pub async fn create_new_process(db: &Database, app_name: String, process: String, eta: u64) -> Result<String> {
     let new_process_id = Uuid::now_v7().to_string();
+
+    let now_time = match UNIX_EPOCH.elapsed() {
+        Ok(time) => to_u64(time),
+        Err(_) => return Err(Error::Repository("System time is before the UNIX_EPOCH".to_string())),
+    };
+
 
     let _: Option<Process> = db
         .conn
         .create(("process", &new_process_id))
         .content(Process {
-            app: app_name.into(),
+            process_id: new_process_id.clone().into(),
             process_name: process.into(),
+            app: app_name.into(),
             status: OperationStatus::New,
-            create_at: to_u64(UNIX_EPOCH.elapsed().unwrap()),
-            updated_at: to_u64(UNIX_EPOCH.elapsed().unwrap()),
+            create_at: now_time,
+            updated_at: now_time,
             complete_at: 0,
             sla: eta, // TODO Default SLA FROM CONFIG
         }).await?;
-
-    // db.query("CREATE process:john SET name = 'John Doe', age = 25").await?.check()?;
-
-    // let mut span = get_global_trace("Oranssi_Opettaja".to_string())
-    //     .start_with_context("send_response_to_end_user", &cx);
-    // span.add_event(
-    //     "send response to end user",
-    //     vec![KeyValue::new("happened", true)],
-    // );
-    // span.set_status(Status::Ok);
-
 
     Ok(new_process_id)
 }
@@ -60,7 +55,7 @@ pub async fn update_process_status(db: &Database, id: String, status: OperationS
     let _: Option<Process> = db.conn.update(("process", id))
         .merge(UpdateProcess {
             status,
-            updated_at: to_u64(UNIX_EPOCH.elapsed().unwrap()),
+            updated_at: from_epoch()?,
         }).await?;
 
     Ok(())
@@ -94,6 +89,27 @@ pub async fn get_process_by_id(db: &Database, id: &str) -> Result<Process> {
 }
 
 #[instrument]
+pub async fn get_running_processes(
+    db: &Database,
+) -> Result<Option<Vec<Process>>> {
+    let mut response: surrealdb::Response = db.conn
+        .query("SELECT * FROM type::table($table)")
+        .bind(("table", "process"))
+        .await?;
+
+
+    let processes: Vec<Process> = response.take(0)?;
+    if processes.is_empty() {
+        return Ok(None);
+    }
+
+    // info!("Get_process_by_id result: {:?}", processes);
+
+    Ok(Some(processes))
+}
+
+
+#[instrument]
 pub async fn check_running_processes(
     db: &Database,
     app: &str,
@@ -109,10 +125,11 @@ pub async fn check_running_processes(
 
     //TODO Create query separately for tracing and logging
     let mut response: surrealdb::Response = db.conn
-        .query("SELECT * FROM type::table($table) WHERE app = $app AND process_name = $process_name")
+        .query("SELECT * FROM type::table($table) WHERE app = $app AND process_name = $process_name AND status = $status")
         .bind(("table", "process"))
         .bind(("app", app))
         .bind(("process_name", process_name))
+        .bind(("status", OperationStatus::New.to_string()))
         .await?;
 
 
@@ -121,7 +138,12 @@ pub async fn check_running_processes(
         return Ok(None);
     }
 
-    // info!("Get_process_by_id result: {:?}", processes);
+    info!("Get_process_by_id result: {:?}", processes);
 
     Ok(Some(processes))
+}
+#[instrument(skip(db))]
+pub async fn delete_process_by_id(db: &Database, id: &str) -> Result<()> {
+    let _: Option<Process> = db.conn.delete(("process", id)).await?;
+    Ok(())
 }

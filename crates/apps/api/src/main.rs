@@ -1,25 +1,27 @@
 mod db;
 mod error;
+mod logger;
 mod models;
 mod rest_api;
 mod time;
-mod logger;
+mod scheduler;
 
+use std::time::Duration;
 use tokio::signal;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 // use tracing::{error, info};
-use lib_utils::env::{get_env};
 use lib_core::tracing;
+use lib_utils::env::get_env;
 
-use tracing_subscriber::{EnvFilter};
+use tracing_subscriber::EnvFilter;
 
 use log::{info, warn};
 use tracing_error::ErrorLayer;
 
+pub use self::error::{Error, Result};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-pub use self::error::{Error, Result};
-
+use crate::scheduler::Scheduler;
 //use surrealdb::engine::local::Mem; uncomment after moving to in memory DB
 //use once_cell::sync::Lazy;
 //static DB: Lazy<Surreal<Db>> = Lazy::new(Surreal::init);
@@ -48,15 +50,14 @@ async fn main() -> Result<()> {
     // log::set_boxed_logger(Box::new(otel_log_appender)).unwrap();
     // log::set_max_level(Level::Debug.to_level_filter());
 
-
     // let (non_blocking_writer, _guard) = tracing_appender::non_blocking(std::io::stdout());
     // let bunyan_formatting_layer =
     //     BunyanFormattingLayer::new("flowlocker".to_string(), non_blocking_writer);
-    // 
+    //
     // let subscriber = Registry::default()
     //     .with(EnvFilter::from_default_env())
     //     .with(JsonStorageLayer);
-    // 
+    //
     // tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let tracer = tracing::init_opentelemetry("flowlocker".to_string())?;
@@ -78,7 +79,6 @@ async fn main() -> Result<()> {
         .with(ErrorLayer::default())
         .init();
 
-
     // tracing_subscriber::fmt()
     //     .with_target(false)
     //     .with_env_filter(EnvFilter::from_default_env())
@@ -94,6 +94,10 @@ async fn main() -> Result<()> {
 
     let database = db::new().await?;
     database.connect().await?;
+
+    let scheduler = Scheduler::new(database.clone(), Duration::from_secs_f64(20_f64));
+
+    scheduler.start().await?;
 
     let _run_axum = tokio::spawn(rest_api::server::new_server(database));
 
@@ -112,7 +116,7 @@ async fn shutdown_signal() {
     };
 
     #[cfg(unix)]
-        let terminate = async {
+    let terminate = async {
         signal::unix::signal(signal::unix::SignalKind::terminate())
             .expect("failed to install signal handler")
             .recv()
@@ -120,7 +124,7 @@ async fn shutdown_signal() {
     };
 
     #[cfg(not(unix))]
-        let terminate = std::future::pending::<()>();
+    let terminate = std::future::pending::<()>();
 
     tokio::select! {
         _ = ctrl_c => {},

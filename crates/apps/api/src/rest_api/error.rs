@@ -121,6 +121,10 @@ impl IntoResponse for ApiError {
             ApiError::ProcessExist(e) => {
                 (StatusCode::LOCKED, e.to_string())
             }
+            ApiError::BadRequest(e) => {
+                (StatusCode::BAD_REQUEST, e.to_string())
+            }
+
             _ => {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,

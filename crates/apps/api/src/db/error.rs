@@ -1,10 +1,15 @@
 pub type Result<T> = core::result::Result<T, Error>;
 use derive_more::From;
 use serde::Serialize;
+use crate::time;
 
 #[derive(Debug, Serialize, From)]
 pub enum Error {
     RecordNotFound,
+    Repository(String),
+
+    #[from]
+    Time(time::error::Error),
 
     #[from]
     SurrealDB(surrealdb::Error),
