@@ -29,6 +29,9 @@ pub enum Error {
     #[from]
     Tracing(tracing::error::Error),
 
+    // #[from]
+    // Time(time::error::Error),
+
     #[from]
     Scheduler(super::scheduler::error::Error),
 }

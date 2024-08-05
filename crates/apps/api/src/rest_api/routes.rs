@@ -1,22 +1,21 @@
 use std::sync::Arc;
-use std::time::Duration;
+
 use axum::{extract::{State, Path, Json}, routing::{post, get}, Router};
 use axum::extract::FromRequest;
 use axum::response::{IntoResponse, Response};
-use opentelemetry::trace::{Span, Status};
-use serde::{Deserialize, Serialize};
+
+use serde::{Serialize};
 
 use crate::db::Database;
 use serde_json::{json, Value};
-use tracing::{error, info, instrument, span};
+use tracing::{error, info, instrument};
 
 
 use uuid::Uuid;
 
-
 use crate::db::repository::{update_process_status, get_process_by_id, check_running_processes, create_new_process};
-use crate::models::OperationStatus;
 
+use super::params::{NewProcess, ProcessData, RequestEndpoint, UnlockProcess, UpdateProcess};
 use super::error::{Result, ApiError, ErrorType};
 
 
@@ -37,48 +36,12 @@ where
     }
 }
 
-
-#[derive(Debug, Serialize, Deserialize)]
-struct GetProcess {
-    id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct NewProcess {
-    app: String,
-    process: String,
-    eta: String,
-}
-
-impl NewProcess {
-    fn eta_to_u64(&self) -> Result<u64> {
-        string_to_duration(self.eta.as_str())
-    }
-}
-
-fn string_to_duration(s: &str) -> Result<u64> {
-    let res = s.trim_end_matches('s').parse::<u64>().map_err(|_| ApiError::BadRequest("Invalid ETA format".to_string()))?;
-    Ok(res)
-}
-
-
-#[derive(Debug, Serialize, Deserialize)]
-struct UpdateProcess {
-    process_id: Uuid,
-    status: OperationStatus,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum RequestEndpoint {
-    StartNewLock,
-    GetLockedProcess,
-}
-
 pub fn routes(db: Database) -> Router {
     Router::new()
-        .route("/api/start_new_lock", post(handle_create_new_lock))
+        .route("/api/lock_new_process", post(handle_create_new_lock))
         .route("/api/get_locked_process/:lock_id", get(handle_get_locked_process))
         .route("/api/update_process_status", post(handle_update_process_status))
+        .route("/api/unlock_process", post(handle_complete_process))
         .with_state(db)
 }
 
@@ -112,20 +75,19 @@ async fn handle_get_locked_process(
 
 async fn handle_update_process_status(
     State(db): State<Database>,
-    AppJson(payload): AppJson<UpdateProcess>,
+    AppJson(payload): AppJson<UnlockProcess>,
 ) -> Response {
-    //TODO process logic. Can't change process from 
     _update_process_status(db, payload).await.into_response()
 }
 
-async fn _update_process_status(
+async fn _update_process_status<T: ProcessData>(
     db: Database,
-    payload: UpdateProcess,
+    data: T,
 ) -> Result<Json<Value>> {
-    let p = match get_process_by_id(&db, payload.process_id.to_string().as_str()).await {
+    let _p = match get_process_by_id(&db, data.get_id().as_str()).await {
         Ok(p) => {
-            if p.status.is_staled() {
-                return Err(ApiError::BadRequest("can't updated Staled process".to_string()));
+            if p.status.is_outdated() {
+                return Err(ApiError::BadRequest("can't updated Outdated process".to_string()));
             } else {
                 p
             }
@@ -134,7 +96,7 @@ async fn _update_process_status(
     };
 
 
-    match update_process_status(&db, payload.process_id.to_string(), payload.status).await {
+    match update_process_status(&db, data.get_id(), data.get_status()).await {
         Ok(ok) => ok,
         Err(e) => return Err(ApiError::BadRequest(e.to_string())),
     };
@@ -146,6 +108,14 @@ async fn _update_process_status(
     }));
 
     Ok(body)
+}
+
+
+async fn handle_complete_process(
+    State(db): State<Database>,
+    AppJson(payload): AppJson<UnlockProcess>,
+) -> Response {
+    _update_process_status(db, payload).await.into_response()
 }
 
 
@@ -169,8 +139,6 @@ async fn _create_new_lock(
     }
 
     let etc = payload.eta_to_u64()?;
-
-    println!("{:?}", etc);
 
     let id = match create_new_process(&db, payload.app, payload.process, etc).await {
         Ok(ok) => ok,

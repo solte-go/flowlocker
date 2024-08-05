@@ -25,6 +25,13 @@ struct UpdateProcess {
     updated_at: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct UnlockProcess {
+    status: OperationStatus,
+    updated_at: u64,
+    complete_at: u64,
+}
+
 pub async fn create_new_process(db: &Database, app_name: String, process: String, eta: u64) -> Result<String> {
     let new_process_id = Uuid::now_v7().to_string();
 
@@ -52,12 +59,22 @@ pub async fn create_new_process(db: &Database, app_name: String, process: String
 }
 
 pub async fn update_process_status(db: &Database, id: String, status: OperationStatus) -> Result<()> {
-    let _: Option<Process> = db.conn.update(("process", id))
-        .merge(UpdateProcess {
-            status,
-            updated_at: from_epoch()?,
-        }).await?;
+    if status == OperationStatus::Completed {
+        let _: Option<Process> = db.conn.update(("process", id))
+            .merge(UnlockProcess {
+                status,
+                updated_at: from_epoch()?,
+                complete_at: from_epoch()?,
 
+            }).await?;
+    } else {
+        let _: Option<Process> = db.conn.update(("process", id))
+            .merge(UpdateProcess {
+                status,
+                updated_at: from_epoch()?,
+            }).await?;
+    }
+    
     Ok(())
 }
 
