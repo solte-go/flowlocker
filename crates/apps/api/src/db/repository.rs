@@ -29,7 +29,7 @@ struct UpdateProcess {
 struct UnlockProcess {
     status: OperationStatus,
     updated_at: u64,
-    complete_at: u64,
+    ended_at: u64,
 }
 
 pub async fn create_new_process(db: &Database, app_name: String, process: String, eta: u64) -> Result<String> {
@@ -51,30 +51,49 @@ pub async fn create_new_process(db: &Database, app_name: String, process: String
             status: OperationStatus::New,
             create_at: now_time,
             updated_at: now_time,
-            complete_at: 0,
+            ended_at: 0,
             sla: eta, // TODO Default SLA FROM CONFIG
         }).await?;
 
     Ok(new_process_id)
 }
 
-pub async fn update_process_status(db: &Database, id: String, status: OperationStatus) -> Result<()> {
-    if status == OperationStatus::Completed {
-        let _: Option<Process> = db.conn.update(("process", id))
-            .merge(UnlockProcess {
-                status,
-                updated_at: from_epoch()?,
-                complete_at: from_epoch()?,
+pub async fn update_process_status(db: &Database, id: &str, status: OperationStatus) -> Result<()> {
+    match status {
+        OperationStatus::Completed | OperationStatus::Canceled | OperationStatus::Outdated => {
+            let _: Option<Process> = db.conn.update(("process", id))
+                .merge(UnlockProcess {
+                    status,
+                    updated_at: from_epoch()?,
+                    ended_at: from_epoch()?,
 
-            }).await?;
-    } else {
-        let _: Option<Process> = db.conn.update(("process", id))
-            .merge(UpdateProcess {
-                status,
-                updated_at: from_epoch()?,
-            }).await?;
+                }).await?;
+        }
+        _ => {
+            let _: Option<Process> = db.conn.update(("process", id))
+                .merge(UpdateProcess {
+                    status,
+                    updated_at: from_epoch()?,
+                }).await?;
+        }
     }
-    
+
+    // if status == OperationStatus::Completed {
+    //     let _: Option<Process> = db.conn.update(("process", id))
+    //         .merge(UnlockProcess {
+    //             status,
+    //             updated_at: from_epoch()?,
+    //             ended_at: from_epoch()?,
+    //
+    //         }).await?;
+    // } else {
+    //     let _: Option<Process> = db.conn.update(("process", id))
+    //         .merge(UpdateProcess {
+    //             status,
+    //             updated_at: from_epoch()?,
+    //         }).await?;
+    // }
+
     Ok(())
 }
 

@@ -12,7 +12,7 @@ pub struct Process {
     pub status: OperationStatus,
     pub create_at: u64,
     pub updated_at: u64,
-    pub complete_at: u64,
+    pub ended_at: u64,
     pub sla: u64,
 }
 
@@ -25,14 +25,14 @@ pub struct ResponseProcess {
     pub create_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub complete_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
     pub sla: u64,
 }
 
 impl Process {
     pub fn to_response(&self) -> ResponseProcess {
-        let complete_at: Option<DateTime<Utc>> = if self.complete_at != 0 {
-            Some(DateTime::from_timestamp(self.complete_at as i64, 0).unwrap_or_default())
+        let ended_at: Option<DateTime<Utc>> = if self.ended_at != 0 {
+            Some(DateTime::from_timestamp(self.ended_at as i64, 0).unwrap_or_default())
         } else {
             None
         };
@@ -44,7 +44,7 @@ impl Process {
             status: self.status.clone(),
             create_at: DateTime::from_timestamp(self.create_at as i64, 0).unwrap_or_default(),
             updated_at: DateTime::from_timestamp(self.updated_at as i64, 0).unwrap_or_default(),
-            complete_at,
+            ended_at,
             // complete_at: DateTime::from_timestamp(self.complete_at as i64, 0).unwrap_or_default(),
             sla: self.sla,
         }
@@ -57,7 +57,7 @@ pub enum OperationStatus {
     New,
     InProgress,
     Completed,
-    Staled,
+    Canceled,
     Outdated,
 }
 
@@ -68,8 +68,8 @@ pub enum OperationStatus {
 // }
 
 impl OperationStatus {
-    pub fn is_staled(&self) -> bool {
-        if self.to_string() == OperationStatus::Staled.to_string() {
+    pub fn is_canceled(&self) -> bool {
+        if self.to_string() == OperationStatus::Canceled.to_string() {
             return true;
         }
         false
@@ -98,7 +98,7 @@ impl std::fmt::Display for OperationStatus {
             OperationStatus::Completed => write!(f, "Completed"),
             OperationStatus::InProgress => write!(f, "InProgress"),
             OperationStatus::Outdated => write!(f, "Outdated"),
-            OperationStatus::Staled => write!(f, "Staled"),
+            OperationStatus::Canceled => write!(f, "Staled"),
         }
     }
 }

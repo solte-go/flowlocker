@@ -5,6 +5,7 @@ use axum::response::IntoResponse;
 use derive_more::From;
 use serde::Serialize;
 use serde_with::{DisplayFromStr, serde_as};
+use strum_macros::Display;
 use tracing::error;
 
 use crate::db;
@@ -13,7 +14,7 @@ use crate::rest_api::routes::AppJson;
 
 pub type Result<T> = core::result::Result<T, ApiError>;
 
-#[derive(Debug)]
+#[derive(Debug, Display)]
 pub enum ApiError {
     JsonExtractorRejection(JsonRejection),
     BadRequest(String),
@@ -100,6 +101,8 @@ impl IntoResponse for ApiError {
         struct ErrorResponse {
             message: String,
         }
+
+        error!("api error: {:?}", &self);
 
         let (status, message) = match self {
             ApiError::JsonExtractorRejection(rejection) => {

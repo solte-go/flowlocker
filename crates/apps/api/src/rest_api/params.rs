@@ -1,12 +1,9 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use crate::models::OperationStatus;
 use crate::rest_api::error::ApiError;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(super) struct GetProcess {
-    id: String,
-}
+pub(super) struct GetProcess {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(super) struct NewProcess {
@@ -44,13 +41,10 @@ fn string_to_duration(duration: &str) -> crate::rest_api::error::Result<u64> {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(super) struct UpdateProcess {
-    process_id: Uuid,
     status: OperationStatus,
 }
 #[derive(Debug, Serialize, Deserialize)]
-pub(super) struct UnlockProcess {
-    process_id: Uuid,
-}
+pub(super) struct UnlockProcess {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RequestEndpoint {
@@ -59,26 +53,17 @@ pub enum RequestEndpoint {
 }
 
 impl ProcessData for UnlockProcess {
-    fn get_id(&self) -> String {
-        self.process_id.to_string()
-    }
-
     fn get_status(&self) -> OperationStatus {
         OperationStatus::Completed
     }
 }
 
 impl ProcessData for UpdateProcess {
-    fn get_id(&self) -> String {
-        self.process_id.to_string()
-    }
-
     fn get_status(&self) -> OperationStatus {
         self.status.clone()
     }
 }
 
 pub trait ProcessData {
-    fn get_id(&self) -> String;
     fn get_status(&self) -> OperationStatus;
 }

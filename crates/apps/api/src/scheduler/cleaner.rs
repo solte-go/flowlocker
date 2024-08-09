@@ -1,5 +1,4 @@
-use std::time::UNIX_EPOCH;
-use crate::scheduler::error::{Error, Result};
+use crate::scheduler::error::{Result};
 use tracing::{debug, info, instrument};
 use crate::db::Database;
 use crate::db::repository::{get_running_processes, update_process_status, delete_process_by_id};
@@ -14,8 +13,8 @@ pub struct Cleaner {
 
 const DEFAULT_DELETION_INTERVAL: u64 = 600;
 
-//Create TASK abstraction
-// Change behaiver of Cleaner
+// Create TASK abstraction
+// Change behavior of Cleaner
 
 impl Cleaner {
     pub fn new(db: Database) -> Self {
@@ -31,7 +30,7 @@ impl Cleaner {
 
         if processes.is_some() {
             for p in processes.unwrap() {
-                if p.status.is_staled() || p.status.is_completed() {
+                if p.status.is_canceled() || p.status.is_completed() {
                     if now_time > p.updated_at + DEFAULT_DELETION_INTERVAL {
                         delete_process_by_id(&self.db, &p.process_id).await?;
                         info!(name = "process deleted", process_id = %p.process_id);
@@ -40,7 +39,7 @@ impl Cleaner {
                 }
 
                 if now_time > p.create_at + p.sla {
-                    update_process_status(&self.db, p.process_id.to_string(), OperationStatus::Outdated).await?;
+                    update_process_status(&self.db, &p.process_id, OperationStatus::Outdated).await?;
                     info!(name = "process status changed", status = OperationStatus::Outdated.to_string());
                 }
             }

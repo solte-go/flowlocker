@@ -14,7 +14,7 @@ use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 use crate::db::repository::{update_process_status, get_process_by_id, check_running_processes, create_new_process};
-
+use crate::models::OperationStatus;
 use super::params::{NewProcess, ProcessData, RequestEndpoint, UnlockProcess, UpdateProcess};
 use super::error::{Result, ApiError, ErrorType};
 
@@ -40,19 +40,15 @@ pub fn routes(db: Database) -> Router {
     Router::new()
         .route("/api/lock_new_process", post(handle_create_new_lock))
         .route("/api/get_locked_process/:lock_id", get(handle_get_locked_process))
-        .route("/api/update_process_status", post(handle_update_process_status))
-        .route("/api/unlock_process", post(handle_complete_process))
+        .route("/api/update_process_status/:lock_id", post(handle_update_process_status))
+        .route("/api/unlock_process/:lock_id", post(handle_complete_process))
         .with_state(db)
 }
 
 async fn handle_create_new_lock(
     State(db): State<Database>,
-    // ctx: CtxW,
     AppJson(payload): AppJson<NewProcess>,
-    // Json(payload): Json<NewProcess>,
 ) -> Response {
-    // let ctx = ctx.0;
-
     let mut res = _create_new_lock(db, payload).await.into_response();
     res.extensions_mut().insert(Arc::new(RequestEndpoint::StartNewLock));
 
@@ -62,11 +58,8 @@ async fn handle_create_new_lock(
 #[instrument]
 async fn handle_get_locked_process(
     State(db): State<Database>,
-    // ctx: CtxW,
     Path(lock_id): Path<Uuid>,
 ) -> Response {
-    // let ctx = ctx.0;
-
     let mut res = _get_locked_process(db, lock_id).await.into_response();
     res.extensions_mut().insert(Arc::new(RequestEndpoint::GetLockedProcess));
 
@@ -75,49 +68,19 @@ async fn handle_get_locked_process(
 
 async fn handle_update_process_status(
     State(db): State<Database>,
-    AppJson(payload): AppJson<UnlockProcess>,
+    Path(lock_id): Path<Uuid>,
+    AppJson(payload): AppJson<UpdateProcess>,
 ) -> Response {
-    _update_process_status(db, payload).await.into_response()
+    _update_process_status(db, lock_id.to_string(), payload).await.into_response()
 }
-
-async fn _update_process_status<T: ProcessData>(
-    db: Database,
-    data: T,
-) -> Result<Json<Value>> {
-    let _p = match get_process_by_id(&db, data.get_id().as_str()).await {
-        Ok(p) => {
-            if p.status.is_outdated() {
-                return Err(ApiError::BadRequest("can't updated Outdated process".to_string()));
-            } else {
-                p
-            }
-        }
-        Err(e) => return Err(ApiError::BadRequest(e.to_string())),
-    };
-
-
-    match update_process_status(&db, data.get_id(), data.get_status()).await {
-        Ok(ok) => ok,
-        Err(e) => return Err(ApiError::BadRequest(e.to_string())),
-    };
-
-    let body = Json(json!({
-        "result": {
-            "success": true,
-        }
-    }));
-
-    Ok(body)
-}
-
 
 async fn handle_complete_process(
     State(db): State<Database>,
+    Path(lock_id): Path<Uuid>,
     AppJson(payload): AppJson<UnlockProcess>,
 ) -> Response {
-    _update_process_status(db, payload).await.into_response()
+    _update_process_status(db, lock_id.to_string(), payload).await.into_response()
 }
-
 
 #[instrument]
 async fn _create_new_lock(
@@ -157,19 +120,9 @@ async fn _create_new_lock(
 
 async fn _get_locked_process(
     db: Database,
-    // Path(apps): Path<String>,
     lock_id: Uuid,
-    // Path(process): Path<String>,
-    // Json(payload): Json<GetProcess>,
 ) -> Result<Json<Value>> {
-    // let request_id = match uuid::Uuid::parse_str(&lock_id) {
-    //     Ok(id) => id,
-    //     Err(e) => return Err(Error::CantParseUUID(e.to_string()))
-    // };
-
     info!("Request with id {:?}", lock_id);
-
-    // let res = get_process_by_id(db, payload.id).await;
     match get_process_by_id(&db, &lock_id.to_string()).await {
         Ok(p) => {
             let body = Json(json!({
@@ -186,4 +139,40 @@ async fn _get_locked_process(
             Err(ApiError::BadRequest(e.to_string()))
         }
     }
+}
+
+async fn _update_process_status<T: ProcessData>(
+    db: Database,
+    id: String,
+    data: T,
+) -> Result<Json<Value>> {
+    if data.get_status() == OperationStatus::Completed || data.get_status() == OperationStatus::Outdated {
+        println!("{}", data.get_status());
+        return Err(ApiError::BadRequest("bad operational status".to_string()));
+    }
+
+    let _p = match get_process_by_id(&db, &id).await {
+        Ok(p) => {
+            if p.status.is_outdated() {
+                return Err(ApiError::BadRequest("can't updated Outdated process".to_string()));
+            } else {
+                p
+            }
+        }
+        Err(e) => return Err(ApiError::BadRequest(e.to_string())),
+    };
+
+
+    match update_process_status(&db, &id, data.get_status()).await {
+        Ok(ok) => ok,
+        Err(e) => return Err(ApiError::BadRequest(e.to_string())),
+    };
+
+    let body = Json(json!({
+        "result": {
+            "success": true,
+        }
+    }));
+
+    Ok(body)
 }
