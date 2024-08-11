@@ -1,10 +1,9 @@
-use crate::scheduler::error::{Result};
-use tracing::{debug, info, instrument};
+use crate::db::repository::{delete_process_by_id, get_running_processes, update_process_status};
 use crate::db::Database;
-use crate::db::repository::{get_running_processes, update_process_status, delete_process_by_id};
 use crate::models::OperationStatus;
+use crate::scheduler::error::Result;
 use crate::time;
-
+use tracing::{debug, info, instrument};
 
 #[derive(Debug, Clone)]
 pub struct Cleaner {
@@ -24,7 +23,6 @@ impl Cleaner {
     pub async fn run(&self) -> Result<()> {
         let now_time = time::from_epoch()?;
 
-
         debug!(name = "job_events", status = "started");
         let processes = get_running_processes(&self.db).await?;
 
@@ -39,8 +37,12 @@ impl Cleaner {
                 }
 
                 if now_time > p.create_at + p.sla {
-                    update_process_status(&self.db, &p.process_id, OperationStatus::Outdated).await?;
-                    info!(name = "process status changed", status = OperationStatus::Outdated.to_string());
+                    update_process_status(&self.db, &p.process_id, OperationStatus::Outdated)
+                        .await?;
+                    info!(
+                        name = "process status changed",
+                        status = OperationStatus::Outdated.to_string()
+                    );
                 }
             }
         }
