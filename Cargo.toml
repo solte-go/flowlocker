@@ -5,11 +5,8 @@ unused = "allow"
 [workspace]
 resolver = "2"
 members = [
-    #    "crates/libs/lib-auth",
-    #    "crates/libs/lib-rpc",
     "crates/libs/lib-core",
     "crates/libs/lib-utils",
+    "crates/libs/lib-query_builder",
     "crates/apps/api",
-    #    "crates/toolsbox/gen-key",
-    #    "crates/toolsbox/uuid_gen",
 ]

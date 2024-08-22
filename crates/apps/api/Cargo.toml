@@ -10,8 +10,10 @@ edition = "2021"
 lib-utils = { path = "../../libs/lib-utils" }
 lib-core = { path = "../../libs/lib-core" }
 
-derive_more = { version = "1.0.0-beta.6", features = ["from"] }
-surrealdb-beta = { version = "1.4.0", features = ["kv-mem"] }
+# -- Database
+surrealdb = { version = "1.5.4", features = ["kv-mem"] }
+
+derive_more = { version = "1.0.0", features = ["from"] }
 once_cell = "1.19.0"
 tokio = { version = "1.0.0", features = ["rt", "rt-multi-thread", "macros", "signal"] }
 uuid = { version = "1.8.0", features = ["v7"] }
@@ -23,13 +25,13 @@ axum = { version = "0.7.5", features = ["macros"] }
 axum-extra = "0.9.3"
 
 # -- JSON
-serde = { version = "1.0.200", features = ["derive"] }
+serde = { version = "1.0.175", features = ["derive"] }
 serde_json = "1.0.116"
 serde_with = "3"
-strum_macros = "0.25"
+strum_macros = "0.26.4"
 
 # -- UTULITY --
-signal-hook = { version = "0.1.6", features = ["tokio-support"] }
+signal-hook = { version = "0.1.17", features = ["tokio-support"] }
 
 # -- TRACING --
 tracing = "0.1"

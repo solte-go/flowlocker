@@ -17,11 +17,11 @@ use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 use super::error::{ApiError, ErrorType, Result};
-use super::params::{NewProcess, ProcessData, RequestEndpoint, UnlockProcess, UpdateProcess};
+use super::params::{GetProcesses, NewProcess, ProcessData, RequestEndpoint, UnlockProcess, UpdateProcess};
 use crate::db::repository::{
-    check_running_processes, create_new_process, get_process_by_id, update_process_status,
+    check_running_processes, create_new_process, get_process_by_id, update_process_status, get_processes
 };
-use crate::models::OperationStatus;
+use crate::models::{OperationStatus, ResponseProcess};
 
 // Create our own JSON extractor by wrapping `axum::Json`. This makes it easy to override the
 // rejection and provide our own which formats errors to match our application.
@@ -42,24 +42,19 @@ where
 
 pub fn routes(db: Database) -> Router {
     Router::new()
-        .route("/api/lock_new_process", post(handle_create_new_lock))
-        .route(
-            "/api/get_locked_process/:lock_id",
-            get(handle_get_locked_process),
-        )
-        .route(
-            "/api/update_process_status/:lock_id",
-            post(handle_update_process_status),
-        )
-        .route("/api/unlock_process/:lock_id", post(handle_unlock_process))
+        .route("/api/lock_new_process", post(create_new_lock))
+        .route( "/api/get_locked_process/:lock_id", get(get_locked_process))
+        .route( "/api/get_processes_list", get(get_processes_list))
+        .route( "/api/update_process_status/:lock_id",post(set_process_status))
+        .route("/api/unlock_process/:lock_id", post(unlock_process))
         .with_state(db)
 }
 
-async fn handle_create_new_lock(
+async fn create_new_lock(
     State(db): State<Database>,
     AppJson(payload): AppJson<NewProcess>,
 ) -> Response {
-    let mut res = _create_new_lock(db, payload).await.into_response();
+    let mut res = _handle_create_new_lock(db, payload).await.into_response();
     res.extensions_mut()
         .insert(Arc::new(RequestEndpoint::StartNewLock));
 
@@ -67,39 +62,75 @@ async fn handle_create_new_lock(
 }
 
 #[instrument]
-async fn handle_get_locked_process(
+async fn get_locked_process(
     State(db): State<Database>,
     Path(lock_id): Path<Uuid>,
 ) -> Response {
-    let mut res = _get_locked_process(db, lock_id).await.into_response();
+    let mut res = _handle_get_locked_process(db, lock_id).await.into_response();
     res.extensions_mut()
         .insert(Arc::new(RequestEndpoint::GetLockedProcess));
 
     res
 }
 
-async fn handle_update_process_status(
+
+async fn get_processes_list(
+    State(db): State<Database>,
+    AppJson(payload): AppJson<GetProcesses>,
+) -> Response {
+   println!("{:?}", payload);
+
+
+    // let mut res= get_processes(&db, payload.app, payload.process, payload.status).await.into_response();
+
+
+    let mut res= match get_processes(&db, payload.app, payload.process, payload.status).await {
+        Ok(processes) => {
+            let data = match processes {
+                Some(p) => p.iter().map(|&r| r.to_response()).collect(),
+                None() => vec![]
+            };
+
+            let body = Json(json!({
+                "result": {
+                    "success": data,    
+                }
+            }));
+
+
+            Ok(body)
+        }
+        Err(e) => {
+            error!("Request completed with the error: {:?}", e);
+            Err(ApiError::BadRequest(e.to_string()))
+        }
+    };
+
+    res.into_response()
+}
+
+async fn set_process_status(
     State(db): State<Database>,
     Path(lock_id): Path<Uuid>,
     AppJson(payload): AppJson<UpdateProcess>,
 ) -> Response {
-    _update_process_status(db, lock_id.to_string(), payload)
+    _handle_set_process_status(db, lock_id.to_string(), payload)
         .await
         .into_response()
 }
 
-async fn handle_unlock_process(
+async fn unlock_process(
     State(db): State<Database>,
     Path(lock_id): Path<Uuid>,
     AppJson(payload): AppJson<UnlockProcess>,
 ) -> Response {
-    _update_process_status(db, lock_id.to_string(), payload)
+     _handle_set_process_status(db, lock_id.to_string(), payload)
         .await
         .into_response()
 }
 
 #[instrument]
-async fn _create_new_lock(
+async fn _handle_create_new_lock(
     // ctx: Ctx,
     db: Database,
     payload: NewProcess,
@@ -138,7 +169,7 @@ async fn _create_new_lock(
     Ok(body)
 }
 
-async fn _get_locked_process(db: Database, lock_id: Uuid) -> Result<Json<Value>> {
+async fn  _handle_get_locked_process(db: Database, lock_id: Uuid) -> Result<Json<Value>> {
     info!("Request with id {:?}", lock_id);
     match get_process_by_id(&db, &lock_id.to_string()).await {
         Ok(p) => {
@@ -158,7 +189,7 @@ async fn _get_locked_process(db: Database, lock_id: Uuid) -> Result<Json<Value>>
     }
 }
 
-async fn _update_process_status<T: ProcessData>(
+async fn _handle_set_process_status<T: ProcessData>(
     db: Database,
     id: String,
     data: T,

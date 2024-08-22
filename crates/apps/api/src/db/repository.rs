@@ -18,7 +18,6 @@ use crate::time::{to_u64, from_epoch};
 
 use super::error::{Result, Error};
 
-
 #[derive(Serialize, Deserialize, Debug)]
 struct UpdateProcess {
     status: OperationStatus,
@@ -143,6 +142,31 @@ pub async fn get_running_processes(
 
     Ok(Some(processes))
 }
+
+#[instrument]
+pub async fn get_processes(
+    db: &Database,
+    app: Option<String>,
+    process_name: Option<String>,
+    status: Option<OperationStatus>
+)->Result<Option<Vec<Process>>>
+{
+
+    let query = QueryBuilder::new()
+        .select("*")
+        .from("process")
+        .filter("true")
+        .if_then(app.is_some(), |q| {
+            q.and("app".equals(&app.unwrap().quoted()))
+        })
+        .build();
+
+
+    println!("query: {query}");
+
+    Ok(None)
+}
+
 
 
 #[instrument]

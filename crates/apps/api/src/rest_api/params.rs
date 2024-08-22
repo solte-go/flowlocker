@@ -3,20 +3,31 @@ use crate::models::OperationStatus;
 use crate::rest_api::error::ApiError;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(super) struct GetProcess {}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub(super) struct NewProcess {
     pub(crate) app: String,
     pub(crate) process: String,
     eta: String,
 }
 
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(super) struct GetProcess {}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(super) struct GetProcesses {
+    pub(crate) app: Option<String>,
+    pub(crate) process: Option<String>,
+    pub(crate) status: Option<OperationStatus>,
+}
+
+
 impl NewProcess {
     pub(crate) fn eta_to_u64(&self) -> crate::rest_api::error::Result<u64> {
         string_to_duration(self.eta.as_str())
     }
 }
+
 
 /// string_to_duration accept data in string format
 /// #### Seconds

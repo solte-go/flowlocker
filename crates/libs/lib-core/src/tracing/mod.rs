@@ -12,6 +12,7 @@ use opentelemetry::{
     trace::{Span, TraceContextExt, TraceError, Tracer},
     Context, KeyValue,
 };
+use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::propagation::TraceContextPropagator;
@@ -83,7 +84,7 @@ pub fn init_opentelemetry(tracer_name: String) -> Result<trace::Tracer> {
                 .with_endpoint("http://localhost:4317"),
         )
         .with_trace_config(
-            trace::config()
+            trace::Config::default()
                 .with_resource(resource)
                 .with_sampler(trace::Sampler::AlwaysOn),
         )
