@@ -7,6 +7,6 @@ resolver = "2"
 members = [
     "crates/libs/lib-core",
     "crates/libs/lib-utils",
-    "crates/libs/lib-query_builder",
+    "crates/libs/lib-query-builder",
     "crates/apps/api",
 ]

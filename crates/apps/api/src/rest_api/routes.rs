@@ -80,23 +80,20 @@ async fn get_processes_list(
 ) -> Response {
    println!("{:?}", payload);
 
-
-    // let mut res= get_processes(&db, payload.app, payload.process, payload.status).await.into_response();
-
-
     let mut res= match get_processes(&db, payload.app, payload.process, payload.status).await {
         Ok(processes) => {
             let data = match processes {
-                Some(p) => p.iter().map(|&r| r.to_response()).collect(),
-                None() => vec![]
+                // Some(p) => p.iter().map(|&r| r.to_response()).collect(),
+                Some(p) => p,
+               _=> Vec::new(),
             };
 
             let body = Json(json!({
                 "result": {
-                    "success": data,    
+                    "success": true,
+                    "data": data,
                 }
             }));
-
 
             Ok(body)
         }

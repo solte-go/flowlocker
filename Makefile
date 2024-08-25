@@ -32,3 +32,6 @@ docker_compose_teardown:  ### - stop and delete docker compose running container
 .PHONY: run
 run:  ### - run instance of flowlocker
 	cargo run -p flowlocker
+
+
+### cargo test -v --package lib-query_builder test_new -- --nocapture

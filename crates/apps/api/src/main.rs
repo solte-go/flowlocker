@@ -3,8 +3,8 @@ mod error;
 mod logger;
 mod models;
 mod rest_api;
-mod time;
 mod scheduler;
+mod time;
 
 use std::time::Duration;
 use tokio::signal;
@@ -19,9 +19,9 @@ use log::{info, warn};
 use tracing_error::ErrorLayer;
 
 pub use self::error::{Error, Result};
+use crate::scheduler::Scheduler;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use crate::scheduler::Scheduler;
 //use surrealdb::engine::local::Mem; uncomment after moving to in memory DB
 //use once_cell::sync::Lazy;
 //static DB: Lazy<Surreal<Db>> = Lazy::new(Surreal::init);

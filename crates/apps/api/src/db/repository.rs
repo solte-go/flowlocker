@@ -1,22 +1,23 @@
 use std::borrow::Cow;
 use std::process;
 
-use std::time::UNIX_EPOCH;
-use opentelemetry::KeyValue;
-use opentelemetry::Context;
 use opentelemetry::trace::{Span, Status, Tracer};
+use opentelemetry::Context;
+use opentelemetry::KeyValue;
 use serde::{Deserialize, Serialize};
-
-use surrealdb::sql::Uuid as SUUID;
-use uuid::{self, Uuid};
-use tracing::{info, instrument, span};
-use lib_core::tracing::get_global_trace;
+use std::time::UNIX_EPOCH;
 
 use crate::db::Database;
 use crate::models::{OperationStatus, Process};
-use crate::time::{to_u64, from_epoch};
+use crate::time::{from_epoch, to_u64};
+use lib_core::tracing::get_global_trace;
+use lib_query_builder::builder::{Argument, QueryBuilder};
+use lib_query_builder::qbj::SurellDBQueryBuilder;
+use surrealdb::sql::Uuid as SUUID;
+use tracing::{error, info, instrument, span};
+use uuid::{self, Uuid};
 
-use super::error::{Result, Error};
+use super::error::{Error, Result};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct UpdateProcess {
@@ -31,14 +32,22 @@ struct UnlockProcess {
     ended_at: u64,
 }
 
-pub async fn create_new_process(db: &Database, app_name: String, process: String, eta: u64) -> Result<String> {
+pub async fn create_new_process(
+    db: &Database,
+    app_name: String,
+    process: String,
+    eta: u64,
+) -> Result<String> {
     let new_process_id = Uuid::now_v7().to_string();
 
     let now_time = match UNIX_EPOCH.elapsed() {
         Ok(time) => to_u64(time),
-        Err(_) => return Err(Error::Repository("System time is before the UNIX_EPOCH".to_string())),
+        Err(_) => {
+            return Err(Error::Repository(
+                "System time is before the UNIX_EPOCH".to_string(),
+            ))
+        }
     };
-
 
     let _: Option<Process> = db
         .conn
@@ -52,7 +61,8 @@ pub async fn create_new_process(db: &Database, app_name: String, process: String
             updated_at: now_time,
             ended_at: 0,
             sla: eta, // TODO Default SLA FROM CONFIG
-        }).await?;
+        })
+        .await?;
 
     Ok(new_process_id)
 }
@@ -60,20 +70,25 @@ pub async fn create_new_process(db: &Database, app_name: String, process: String
 pub async fn update_process_status(db: &Database, id: &str, status: OperationStatus) -> Result<()> {
     match status {
         OperationStatus::Completed | OperationStatus::Canceled | OperationStatus::Outdated => {
-            let _: Option<Process> = db.conn.update(("process", id))
+            let _: Option<Process> = db
+                .conn
+                .update(("process", id))
                 .merge(UnlockProcess {
                     status,
                     updated_at: from_epoch()?,
                     ended_at: from_epoch()?,
-
-                }).await?;
+                })
+                .await?;
         }
         _ => {
-            let _: Option<Process> = db.conn.update(("process", id))
+            let _: Option<Process> = db
+                .conn
+                .update(("process", id))
                 .merge(UpdateProcess {
                     status,
                     updated_at: from_epoch()?,
-                }).await?;
+                })
+                .await?;
         }
     }
 
@@ -124,14 +139,12 @@ pub async fn get_process_by_id(db: &Database, id: &str) -> Result<Process> {
 }
 
 #[instrument]
-pub async fn get_running_processes(
-    db: &Database,
-) -> Result<Option<Vec<Process>>> {
-    let mut response: surrealdb::Response = db.conn
+pub async fn get_running_processes(db: &Database) -> Result<Option<Vec<Process>>> {
+    let mut response: surrealdb::Response = db
+        .conn
         .query("SELECT * FROM type::table($table)")
         .bind(("table", "process"))
         .await?;
-
 
     let processes: Vec<Process> = response.take(0)?;
     if processes.is_empty() {
@@ -144,30 +157,50 @@ pub async fn get_running_processes(
 }
 
 #[instrument]
-pub async fn get_processes(
-    db: &Database,
-    app: Option<String>,
-    process_name: Option<String>,
-    status: Option<OperationStatus>
-)->Result<Option<Vec<Process>>>
-{
-
-    let query = QueryBuilder::new()
+pub async fn get_processes(db: &Database, app: Option<String>, process_name: Option<String>, status: Option<OperationStatus>,
+) -> Result<Option<Vec<Process>>> {
+    let mut qb = QueryBuilder::new()
         .select("*")
-        .from("process")
-        .filter("true")
-        .if_then(app.is_some(), |q| {
-            q.and("app".equals(&app.unwrap().quoted()))
-        })
-        .build();
+        .from("type::table($1)", Argument::StringArg("process".to_string()))
+        .filter("app = $2", Argument::StringArg(app.unwrap().to_string()))
+        .and("status = $3", Argument::StringArg(OperationStatus::New.to_string()));
 
 
-    println!("query: {query}");
+    let (query, args_count) = qb.build().unwrap();
 
-    Ok(None)
+    println!("{:?}", query);
+
+    let mut res = db.conn.query(query)
+        .bind(("table", "process"))
+        // .bind(("app", app.unwrap()))
+        .bind(("status", OperationStatus::New.to_string()))
+        .await?;
+
+    let processes: Vec<Process> = res.take(0)?;
+
+    Ok(Some(processes))
 }
+// for i in args_count {
+//     req.bind(("table", "process"));
+// }
 
 
+//     let mut response: Vec<Process> = db.conn.select("process").await?;
+//     println!("{:?}", response);
+//     // match response {
+//     //     Ok(r) => {
+//     //         match r {
+//     //             Some(r) => Ok(r),
+//     //             None => Ok(None),
+//     //         }
+//     //     }
+//     //     Err(e) => {
+//     //         error!("error {}", e.to_string());
+//     //         Err(Error::BadQuery)
+//     //     }
+//     // }
+//     Ok(Some(response))
+// }
 
 #[instrument]
 pub async fn check_running_processes(
@@ -177,11 +210,9 @@ pub async fn check_running_processes(
 ) -> Result<Option<Vec<Process>>> {
     println!("{:?}{:?}", app, process_name);
 
-
     //TODO move to Tracing package
     // let tracer = get_global_trace("flowlocker".to_string());
     // tracer.start_with_context("check_running_processes", span_ctx);
-
 
     //TODO Create query separately for tracing and logging
     let mut response: surrealdb::Response = db.conn
@@ -191,7 +222,6 @@ pub async fn check_running_processes(
         .bind(("process_name", process_name))
         .bind(("status", OperationStatus::New.to_string()))
         .await?;
-
 
     let processes: Vec<Process> = response.take(0)?;
     if processes.is_empty() {
