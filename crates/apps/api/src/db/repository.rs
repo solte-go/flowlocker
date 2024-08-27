@@ -161,46 +161,29 @@ pub async fn get_processes(db: &Database, app: Option<String>, process_name: Opt
 ) -> Result<Option<Vec<Process>>> {
     let mut qb = QueryBuilder::new()
         .select("*")
-        .from("type::table($1)", Argument::StringArg("process".to_string()))
-        .filter("app = $2", Argument::StringArg(app.unwrap().to_string()))
-        .and("status = $3", Argument::StringArg(OperationStatus::New.to_string()));
+        .from("type::table($table)", Argument::StringArg("process".to_string()))
+        .filter("app = $app", "app".to_string(),Argument::StringArg(app.unwrap().to_string()))
+        .and("status = $status", "status".to_string(), Argument::StringArg(OperationStatus::New.to_string()));
 
+    // "SELECT * FROM type::table($1) WHERE app = $2 AND status = $3"
 
-    let (query, args_count) = qb.build().unwrap();
+    let (query, args) = qb.build().unwrap();
 
     println!("{:?}", query);
 
-    let mut res = db.conn.query(query)
-        .bind(("table", "process"))
-        // .bind(("app", app.unwrap()))
-        .bind(("status", OperationStatus::New.to_string()))
-        .await?;
+    let mut res = db.conn.query(query);
 
-    let processes: Vec<Process> = res.take(0)?;
+    for  arg in args.iter() {
+        let key = println!("{:?}", arg);
+        res = res.bind((arg.0, arg.1));
+    }
 
-    Ok(Some(processes))
+    let mut resp:surrealdb::Response = res.await?;
+
+    let p:Vec<Process> = resp.take(0)?;
+
+    Ok(Some(p))
 }
-// for i in args_count {
-//     req.bind(("table", "process"));
-// }
-
-
-//     let mut response: Vec<Process> = db.conn.select("process").await?;
-//     println!("{:?}", response);
-//     // match response {
-//     //     Ok(r) => {
-//     //         match r {
-//     //             Some(r) => Ok(r),
-//     //             None => Ok(None),
-//     //         }
-//     //     }
-//     //     Err(e) => {
-//     //         error!("error {}", e.to_string());
-//     //         Err(Error::BadQuery)
-//     //     }
-//     // }
-//     Ok(Some(response))
-// }
 
 #[instrument]
 pub async fn check_running_processes(

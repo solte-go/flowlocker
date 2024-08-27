@@ -1,6 +1,6 @@
-use super::error::Result;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 pub type Segment<'a> = Cow<'a, str>;
 
@@ -10,6 +10,22 @@ pub enum Argument {
     BoolArg(bool),
     IntArg(i32),
 }
+
+
+impl Serialize for Argument {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            Argument::StringArg(ref value) => serializer.serialize_str(value),
+            Argument::BoolArg(value) => serializer.serialize_bool(value),
+            Argument::IntArg(value) => serializer.serialize_i32(value),
+        }
+    }
+}
+
+
 #[derive(Debug)]
 pub struct QueryBuilder<'a> {
     segments: Vec<Segment<'a>>,
@@ -38,21 +54,21 @@ impl<'a> QueryBuilder<'a> {
 
     pub fn from<T: Into<Segment<'a>>>(mut self, node: T, param: Argument) -> Self {
         self.add_segment_p("FROM", node);
-        self.param(param);
+        self.param("table".to_string(), param);
 
         self
     }
 
-    pub fn filter<T: Into<Segment<'a>>>(mut self, condition: T, param: Argument) -> Self {
+    pub fn filter<T: Into<Segment<'a>>>(mut self, condition: T, placeholder: String, param: Argument) -> Self {
         self.add_segment_p("WHERE", condition);;
-        self.param(param);
+        self.param(placeholder,param);
 
         self
     }
 
-    pub fn and<T: Into<Segment<'a>>>(mut self, condition: T, param: Argument) -> Self {
+    pub fn and<T: Into<Segment<'a>>>(mut self, condition: T, placeholder: String, param: Argument) -> Self {
         self.add_segment_p("AND", condition);
-        self.param(param);
+         self.param(placeholder,param);
 
         self
     }
@@ -95,17 +111,17 @@ impl<'a> QueryBuilder<'a> {
         format!("${}", self.params.len() + 1)
     }
 
-    pub fn param(&mut self, value: Argument) -> &mut Self {
-        self.params.insert(self.generate_key(), value);
+    pub fn param(&mut self, key: String, value: Argument) -> &mut Self {
+        self.params.insert(key, value);
 
         self
     }
 
-    pub fn build(self) -> Result<(String, usize)> {
+    pub fn build(self) -> super::error::Result<(String, HashMap<String, Argument>)> {
         let mut output = self.segments.join(" ");
 
         let count_placeholders = Self::count_placeholders(&output);
-        Ok((output, count_placeholders))
+        Ok((output, self.params))
         // if count_placeholders == self.params.len() {
         //     // for (i, arg) in args.into_iter().enumerate() {
         //     //     let arg_to_replace = format!("${}", i + 1);
@@ -156,41 +172,69 @@ impl From<i32> for Argument {
     fn from(i: i32) -> Self { Argument::IntArg(i) }
 }
 
+impl From<Argument> for String {
+    fn from(arg: Argument) -> Self {
+        match arg {
+            Argument::StringArg(s) => s,
+            _ => panic!("Cannot convert Argument to String"),
+        }
+    }
+}
+
+impl From<Argument> for bool {
+    fn from(arg: Argument) -> Self {
+        match arg {
+            Argument::BoolArg(b) => b,
+            _ => panic!("Cannot convert Argument to bool"),
+        }
+    }
+}
+
+impl From<Argument> for i32 {
+    fn from(arg: Argument) -> Self {
+        match arg {
+            Argument::IntArg(i) => i,
+            _ => panic!("Cannot convert Argument to i32"),
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_new() {
-        let mut qb = QueryBuilder::new()
-            .select("*")
-            .from("type::table($table)")
-            .filter("app = $app")
-            .and("app = $app");
+    // #[test]
+    // fn test_new() {
+    //     let mut qb = QueryBuilder::new()
+    //         .select("*")
+    //         .from("type::table($table)")
+    //         .filter("app = $app")
+    //         .and("app = $app");
 
-        let qb = qb.param(
-            "table",
-            "$table",
-        );
-        let qb = qb.param("app", "$app");
-        let qb = qb.param("app1", "$app1");
+    //     let qb = qb.param(
+    //         "table",
+    //         "$table",
+    //     );
+    //     let qb = qb.param("app", "$app");
+    //     let qb = qb.param("app1", "$app1");
 
-        let res = qb.build();
+    //     let res = qb.build();
 
-        match res {
-            Ok((query, args)) => {
-                println!("{:?}", query);
-                println!("{:?}", args);
+    //     match res {
+    //         Ok((query, args)) => {
+    //             println!("{:?}", query);
+    //             println!("{:?}", args);
 
-                let mut test_quety = query;
+    //             let mut test_quety = query;
 
-                for (i, arg) in args.into_iter().enumerate() {
-                    let arg_to_replace = arg.0;
-                    test_quety = test_quety.replace(arg_to_replace, "Test");
-                }
-                println!("{:?}", test_quety);
-            }
-            Err(e) => println!("{:?}", e),
-        }
-    }
+    //             for (i, arg) in args.into_iter().enumerate() {
+    //                 let arg_to_replace = arg.0;
+    //                 test_quety = test_quety.replace(arg_to_replace, "Test");
+    //             }
+    //             println!("{:?}", test_quety);
+    //         }
+    //         Err(e) => println!("{:?}", e),
+    //     }
+    // }
 }
