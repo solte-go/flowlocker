@@ -191,5 +191,5 @@ type CtxExtResult = core::result::Result<CtxW, CtxExtError>;
 #[derive(Clone, Serialize, Debug)]
 pub enum CtxExtError {
     CtxNotInRequestExt,
-    CtxCreateFail(String),
+    // CtxCreateFail(String),
 }

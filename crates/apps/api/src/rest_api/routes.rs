@@ -19,9 +19,9 @@ use uuid::Uuid;
 use super::error::{ApiError, ErrorType, Result};
 use super::params::{GetProcesses, NewProcess, ProcessData, RequestEndpoint, UnlockProcess, UpdateProcess};
 use crate::db::repository::{
-    check_running_processes, create_new_process, get_process_by_id, update_process_status, get_processes
+    check_running_processes, create_new_process, get_process_by_id, update_process_status, get_processes,
 };
-use crate::models::{OperationStatus, ResponseProcess};
+use crate::models::{OperationStatus};
 
 // Create our own JSON extractor by wrapping `axum::Json`. This makes it easy to override the
 // rejection and provide our own which formats errors to match our application.
@@ -43,9 +43,9 @@ where
 pub fn routes(db: Database) -> Router {
     Router::new()
         .route("/api/lock_new_process", post(create_new_lock))
-        .route( "/api/get_locked_process/:lock_id", get(get_locked_process))
-        .route( "/api/get_processes_list", get(get_processes_list))
-        .route( "/api/update_process_status/:lock_id",post(set_process_status))
+        .route("/api/get_locked_process/:lock_id", get(get_locked_process))
+        .route("/api/get_processes_list", get(get_processes_list))
+        .route("/api/update_process_status/:lock_id", post(set_process_status))
         .route("/api/unlock_process/:lock_id", post(unlock_process))
         .with_state(db)
 }
@@ -78,14 +78,14 @@ async fn get_processes_list(
     State(db): State<Database>,
     AppJson(payload): AppJson<GetProcesses>,
 ) -> Response {
-   println!("{:?}", payload);
+    println!("{:?}", payload);
 
-    let mut res= match get_processes(&db, payload.app, payload.process, payload.status).await {
+    let res = match get_processes(&db, payload.app, payload.process, payload.status).await {
         Ok(processes) => {
             let data = match processes {
                 // Some(p) => p.iter().map(|&r| r.to_response()).collect(),
                 Some(p) => p,
-               _=> Vec::new(),
+                _ => Vec::new(),
             };
 
             let body = Json(json!({
@@ -121,7 +121,7 @@ async fn unlock_process(
     Path(lock_id): Path<Uuid>,
     AppJson(payload): AppJson<UnlockProcess>,
 ) -> Response {
-     _handle_set_process_status(db, lock_id.to_string(), payload)
+    _handle_set_process_status(db, lock_id.to_string(), payload)
         .await
         .into_response()
 }
@@ -166,7 +166,7 @@ async fn _handle_create_new_lock(
     Ok(body)
 }
 
-async fn  _handle_get_locked_process(db: Database, lock_id: Uuid) -> Result<Json<Value>> {
+async fn _handle_get_locked_process(db: Database, lock_id: Uuid) -> Result<Json<Value>> {
     info!("Request with id {:?}", lock_id);
     match get_process_by_id(&db, &lock_id.to_string()).await {
         Ok(p) => {

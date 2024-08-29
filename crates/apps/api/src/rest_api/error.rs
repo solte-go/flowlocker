@@ -1,4 +1,3 @@
-use std::fmt;
 use axum::extract::rejection::JsonRejection;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;

@@ -1,20 +1,15 @@
 use std::borrow::Cow;
-use std::process;
-
-use opentelemetry::trace::{Span, Status, Tracer};
-use opentelemetry::Context;
-use opentelemetry::KeyValue;
+use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use std::time::UNIX_EPOCH;
 
 use crate::db::Database;
 use crate::models::{OperationStatus, Process};
 use crate::time::{from_epoch, to_u64};
-use lib_core::tracing::get_global_trace;
-use lib_query_builder::builder::{Argument, QueryBuilder};
-use lib_query_builder::qbj::SurellDBQueryBuilder;
-use surrealdb::sql::Uuid as SUUID;
-use tracing::{error, info, instrument, span};
+
+use lib_query_builder::builder::{Parameter, QueryBuilder, Conditions};
+
+use tracing::{debug, info, instrument};
 use uuid::{self, Uuid};
 
 use super::error::{Error, Result};
@@ -92,44 +87,14 @@ pub async fn update_process_status(db: &Database, id: &str, status: OperationSta
         }
     }
 
-    // if status == OperationStatus::Completed {
-    //     let _: Option<Process> = db.conn.update(("process", id))
-    //         .merge(UnlockProcess {
-    //             status,
-    //             updated_at: from_epoch()?,
-    //             ended_at: from_epoch()?,
-    //
-    //         }).await?;
-    // } else {
-    //     let _: Option<Process> = db.conn.update(("process", id))
-    //         .merge(UpdateProcess {
-    //             status,
-    //             updated_at: from_epoch()?,
-    //         }).await?;
-    // }
-
     Ok(())
 }
 
 #[instrument(skip(db))]
 pub async fn get_process_by_id(db: &Database, id: &str) -> Result<Process> {
-    // let p: Option<Process> = db.conn.select(("process", id)).await?;
-
     let result: Option<Process> = db.conn.select(("process", id)).await?;
 
     info!("Get_process_by_id result: {:?}", result);
-
-    // let mut result: surrealdb::Response = db.conn
-    //     .query("SELECT * FROM type::table($table) WHERE p_id = $id")
-    //     .bind(("table", "process"))
-    //     .bind(("id", "018fa928-0025-7ec3-9538-77d9c3ccf780"))
-    //     .await?;
-
-    // if let Err(e) = result.take::<Option<Process>>(0) {
-    //         println!("Failed to retrieve a entry: {e:#?}");
-    // }
-
-    // let process: Option<Process> = result.take(0)?;
 
     if result.is_none() {
         return Err(Error::RecordNotFound);
@@ -151,36 +116,66 @@ pub async fn get_running_processes(db: &Database) -> Result<Option<Vec<Process>>
         return Ok(None);
     }
 
-    // info!("Get_process_by_id result: {:?}", processes);
-
     Ok(Some(processes))
+}
+
+enum Column {
+    App,
+    ProcessName,
+    Status,
+}
+
+impl Column {
+    fn to_string(&self) -> Cow<'static, str> {
+        match self {
+            Column::App => Cow::Borrowed("app"),
+            Column::ProcessName => Cow::Borrowed("process_name"),
+            Column::Status => Cow::Borrowed("status"),
+        }
+    }
+}
+
+impl Display for Column {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Column::App => "app".to_string(),
+            Column::ProcessName => "process_name".to_string(),
+            Column::Status => "status".to_string(),
+        };
+        write!(f, "{}", str)
+    }
 }
 
 #[instrument]
 pub async fn get_processes(db: &Database, app: Option<String>, process_name: Option<String>, status: Option<OperationStatus>,
 ) -> Result<Option<Vec<Process>>> {
-    let mut qb = QueryBuilder::new()
+    let mut qb = QueryBuilder::default()
         .select("*")
-        .from("type::table($table)", Argument::StringArg("process".to_string()))
-        .filter("app = $app", "app".to_string(),Argument::StringArg(app.unwrap().to_string()))
-        .and("status = $status", "status".to_string(), Argument::StringArg(OperationStatus::New.to_string()));
+        .from("type::table($table)", Parameter::StringArg("process".to_string()));
 
-    // "SELECT * FROM type::table($1) WHERE app = $2 AND status = $3"
+    if app.is_some() {
+        qb = qb.filter(Column::App, Conditions::Eq, app.unwrap().to_string());
+    }
+
+    if process_name.is_some() {
+        qb = qb.filter(Column::ProcessName, Conditions::Eq, process_name.unwrap().to_string());
+    }
+
+    if status.is_some() {
+        qb = qb.and(Column::Status, Conditions::Eq, status.unwrap().to_string());
+    }
 
     let (query, args) = qb.build().unwrap();
 
-    println!("{:?}", query);
-
     let mut res = db.conn.query(query);
 
-    for  arg in args.iter() {
-        let key = println!("{:?}", arg);
+    for arg in args.iter() {
         res = res.bind((arg.0, arg.1));
     }
 
-    let mut resp:surrealdb::Response = res.await?;
+    let mut resp: surrealdb::Response = res.await?;
 
-    let p:Vec<Process> = resp.take(0)?;
+    let p: Vec<Process> = resp.take(0)?;
 
     Ok(Some(p))
 }
@@ -191,7 +186,6 @@ pub async fn check_running_processes(
     app: &str,
     process_name: &str,
 ) -> Result<Option<Vec<Process>>> {
-    println!("{:?}{:?}", app, process_name);
 
     //TODO move to Tracing package
     // let tracer = get_global_trace("flowlocker".to_string());
@@ -211,7 +205,7 @@ pub async fn check_running_processes(
         return Ok(None);
     }
 
-    info!("Get_process_by_id result: {:?}", processes);
+    debug!("Get_process_by_id result: {:?}", processes);
 
     Ok(Some(processes))
 }

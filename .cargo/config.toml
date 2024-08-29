@@ -1,5 +1,6 @@
 [env]
 
 # Scope down tracing, to filter out external lib tracing.
-RUST_LOG = "flowlocker=debug"
-ENV = "dev"
+RUST_LOG = "flowlocker=info"
+DEVELOPMENT = "dev"
+SCHEDULER_INTERVAL = "30s"

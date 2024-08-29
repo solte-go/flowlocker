@@ -28,7 +28,7 @@ impl Cleaner {
 
         if processes.is_some() {
             for p in processes.unwrap() {
-                if p.status.is_canceled() || p.status.is_completed() {
+                if p.status.is_canceled() || p.status.is_completed() || p.status.is_outdated() {
                     if now_time > p.updated_at + DEFAULT_DELETION_INTERVAL {
                         delete_process_by_id(&self.db, &p.process_id).await?;
                         info!(name = "process deleted", process_id = %p.process_id);

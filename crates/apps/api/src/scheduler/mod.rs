@@ -2,14 +2,14 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tokio::runtime::Runtime;
-use tracing::{error, info, instrument};
+use tracing::{debug, error, instrument};
 use crate::db::Database;
 use crate::scheduler::cleaner::Cleaner;
 
 pub mod error;
 mod cleaner;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Scheduler {
     cleaner: Arc<Cleaner>,
     interval: Duration,
@@ -25,17 +25,18 @@ impl Scheduler {
 
     #[instrument(skip(self))]
     pub async fn start(&self) -> error::Result<()> {
-        tracing::info_span!("scheduler_events");
+        // tracing::info_span!("scheduler_events");
         let rt = Arc::new(Mutex::new(Runtime::new().unwrap()));
 
         let rt_clone = Arc::clone(&rt);
         let cmd = Arc::clone(&self.cleaner);
+        let interval = self.interval;
         thread::spawn(move || {
             let rt = rt_clone.lock().unwrap();
 
             // Run the tokio interval inside the runtime
             rt.block_on(async {
-                let mut ticker = tokio::time::interval(Duration::from_secs(20));
+                let mut ticker = tokio::time::interval(interval);
 
                 loop {
                     ticker.tick().await;
@@ -45,7 +46,7 @@ impl Scheduler {
                             error!("{:?}", e)
                         }
                         _ => {
-                            info!(caller = "scheduler", event = "cleanup cycle completed successfully")
+                            debug!(caller = "scheduler", event = "cleanup cycle completed successfully")
                         }
                     }
                 }
