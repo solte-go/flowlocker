@@ -29,6 +29,9 @@ docker_compose_down:  ### - stop docker compose running containers setup
 docker_compose_teardown:  ### - stop and delete docker compose running containers setup
 	docker compose -f ./deployments/docker-compose.yaml down -v
 
-.PHONY: cargo_run_flowlocker
-cargo_run_flowlocker:  ### - run instance of flowlocker
+.PHONY: run
+run:  ### - run instance of flowlocker
 	cargo run -p flowlocker
+
+
+### cargo test -v --package lib-query_builder test_new -- --nocapture
