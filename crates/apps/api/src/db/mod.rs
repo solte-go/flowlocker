@@ -1,7 +1,9 @@
 pub mod error;
-pub mod repository;
 
 use std::sync::Arc;
+
+use crate::config::config;
+
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
@@ -23,8 +25,8 @@ impl Database {
     pub async fn connect(&self) -> Result<()> {
         self.conn
             .signin(Root {
-                username: "surreal_user",
-                password: "dev_surreal_pass",
+                username: config().db_user.as_str(),
+                password: config().db_password.as_str(),
             })
             .await?;
 

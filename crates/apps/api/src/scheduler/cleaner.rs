@@ -1,4 +1,4 @@
-use crate::db::repository::{delete_process_by_id, get_running_processes, update_process_status};
+use crate::repository::repository::{delete_process_by_id, get_running_processes, update_process_status};
 use crate::db::Database;
 use crate::models::OperationStatus;
 use crate::scheduler::error::Result;

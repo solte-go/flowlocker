@@ -18,7 +18,7 @@ pub(super) struct GetProcess {}
 pub(super) struct GetProcesses {
     pub(crate) app: Option<String>,
     pub(crate) process: Option<String>,
-    pub(crate) status: Option<OperationStatus>,
+    pub(crate) status: Option<Vec<OperationStatus>>,
 }
 
 

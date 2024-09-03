@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use super::error::{ApiError, ErrorType, Result};
 use super::params::{GetProcesses, NewProcess, ProcessData, RequestEndpoint, UnlockProcess, UpdateProcess};
-use crate::db::repository::{
+use crate::repository::repository::{
     check_running_processes, create_new_process, get_process_by_id, update_process_status, get_processes,
 };
 use crate::models::{OperationStatus};
@@ -119,9 +119,8 @@ async fn set_process_status(
 async fn unlock_process(
     State(db): State<Database>,
     Path(lock_id): Path<Uuid>,
-    AppJson(payload): AppJson<UnlockProcess>,
 ) -> Response {
-    _handle_set_process_status(db, lock_id.to_string(), payload)
+    _handle_set_process_status(db, lock_id.to_string(), UnlockProcess {})
         .await
         .into_response()
 }

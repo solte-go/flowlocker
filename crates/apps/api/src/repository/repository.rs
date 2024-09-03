@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use std::time::UNIX_EPOCH;
-
 use crate::db::Database;
 use crate::models::{OperationStatus, Process};
 use crate::time::{from_epoch, to_u64};
@@ -147,11 +146,11 @@ impl Display for Column {
 }
 
 #[instrument]
-pub async fn get_processes(db: &Database, app: Option<String>, process_name: Option<String>, status: Option<OperationStatus>,
+pub async fn get_processes(db: &Database, app: Option<String>, process_name: Option<String>, status: Option<Vec<OperationStatus>>,
 ) -> Result<Option<Vec<Process>>> {
     let mut qb = QueryBuilder::default()
         .select("*")
-        .from("type::table($table)", Parameter::StringArg("process".to_string()));
+        .from("process".to_string());
 
     if app.is_some() {
         qb = qb.filter(Column::App, Conditions::Eq, app.unwrap().to_string());
@@ -162,7 +161,9 @@ pub async fn get_processes(db: &Database, app: Option<String>, process_name: Opt
     }
 
     if status.is_some() {
-        qb = qb.and(Column::Status, Conditions::Eq, status.unwrap().to_string());
+        for e in status.unwrap().iter() {
+            qb = qb.and_or(Column::Status, Conditions::Eq, e.to_string());
+        }
     }
 
     let (query, args) = qb.build().unwrap();
@@ -170,7 +171,7 @@ pub async fn get_processes(db: &Database, app: Option<String>, process_name: Opt
     let mut res = db.conn.query(query);
 
     for arg in args.iter() {
-        res = res.bind((arg.0, arg.1));
+        res = res.bind((&arg.0, &arg.1));
     }
 
     let mut resp: surrealdb::Response = res.await?;

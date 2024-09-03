@@ -1,8 +1,7 @@
 use std::fmt::Formatter;
 use derive_more::From;
-use crate::rest_api;
+use crate::{db, repository, rest_api};
 use lib_core::tracing;
-use crate::db;
 
 pub type Result<T> = core::result::Result<T, Error>;
 // pub type Error = Box<dyn std::error::Error>; // For tests and early development
@@ -22,7 +21,9 @@ pub enum Error {
     #[from]
     DB(db::error::Error),
 
-    //
+    #[from]
+    Repository(repository::error::Error),
+
     #[from]
     Utils(lib_utils::env::Error),
 

@@ -1,21 +1,21 @@
 use derive_more::From;
-use crate::{repository, time};
-
+use serde::Serialize;
+use crate::time;
 pub type Result<T> = core::result::Result<T, Error>;
 
-#[derive(Debug, From)]
+#[derive(Debug, Serialize, From)]
 pub enum Error {
-    Job(String),
+    RecordNotFound,
+    Repository(String),
+    BadQuery,
 
     #[from]
-    Repository(repository::error::Error),
+    SurrealDB(surrealdb::Error),
 
     #[from]
     Time(time::error::Error),
-
-    #[from]
-    Cron(tokio_cron_scheduler::JobSchedulerError),
 }
+
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

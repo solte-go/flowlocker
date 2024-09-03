@@ -13,6 +13,9 @@ pub struct Config {
     // Scheduler
     pub sch_interval: Duration,
 
+    // DB
+    pub db_user: String,
+    pub db_password: String,
 }
 
 pub fn config() -> &'static Config {
@@ -30,9 +33,14 @@ impl Config {
     fn load_from_env() -> Result<Config> {
         let interval: Duration = get_env_duration("SCHEDULER_INTERVAL")?;
 
+        let db_user = get_env("SURREAL_DB_USER")?;
+        let db_password = get_env("SURREAL_DB_PASSWORD")?;
+
         let config = Config {
             development: get_env("DEVELOPMENT").unwrap_or_else(|_| "".to_string()),
             sch_interval: interval,
+            db_user,
+            db_password,
         };
 
         Ok(config)

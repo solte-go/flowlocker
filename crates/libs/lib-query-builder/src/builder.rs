@@ -31,19 +31,6 @@ impl Conditions {
     }
 }
 
-pub fn condition<T, C>(c: &C, con: Conditions, p: T) -> (String, Parameter)
-where
-    T: From<T>,
-    Parameter: From<T>,
-    C: ToString,
-{
-    let parameter: Parameter = p.into();
-
-    let condition = format!("{} {} ${}", c.to_string(), con.to_string(), c.to_string());
-
-    (condition, parameter)
-}
-
 impl Serialize for Parameter {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -68,6 +55,7 @@ pub struct QueryBuilder<'a> {
     segments: Vec<Segment<'a>>,
     params: HashMap<String, Parameter>,
     insert_exceptions: QueryBuilderInsertExceptions,
+    and_or_exceptions: bool,
 }
 
 
@@ -77,6 +65,7 @@ impl<'a> Default for QueryBuilder<'a> {
             segments: Vec::new(),
             params: HashMap::new(),
             insert_exceptions: QueryBuilderInsertExceptions::None,
+            and_or_exceptions: false,
         }
     }
 }
@@ -93,9 +82,20 @@ impl<'a> QueryBuilder<'a> {
         self
     }
 
-    pub fn from<T: Into<Segment<'a>>>(mut self, node: T, param: Parameter) -> Self {
+    fn next_param_index(&self) -> usize {
+        self.params.len() + 1
+    }
+
+    pub fn from<T>(mut self, param: T) -> Self
+    where
+        T: From<T>,
+        Parameter: From<T>,
+    {
+        let t = format!("type::table(${})", self.next_param_index());
+        let node: Segment = t.into();
+
         self.add_segment_p("FROM", node);
-        self.param("table".to_string(), param);
+        self.param(param.into());
 
         self
     }
@@ -106,16 +106,16 @@ impl<'a> QueryBuilder<'a> {
         Parameter: From<T>,
         C: ToString,
     {
-        let (new_condition, new_parameter) = condition(&column, conditions, param);
+        let (new_condition, new_parameter) = self.condition(&column, conditions, param);
 
         let where_segment: Segment = "WHERE".into();
 
         if self.segments.contains(&where_segment) {
             self.add_segment_p("AND", new_condition);
-            self.param(column.to_string(), new_parameter);
+            self.param(new_parameter);
         } else {
             self.add_segment_p("WHERE", new_condition);
-            self.param(column.to_string(), new_parameter);
+            self.param(new_parameter);
         }
 
         self
@@ -127,20 +127,79 @@ impl<'a> QueryBuilder<'a> {
         Parameter: From<T>,
         C: ToString,
     {
-        let (new_con, p) = condition(&column, conditions, param);
-
+        let (new_con, p) = self.condition(&column, conditions, param);
 
         self.add_segment_p("AND", new_con);
-        self.param(column.to_string(), p);
+        self.param(p);
 
         self
     }
 
-    pub fn or<T: Into<Segment<'a>>>(mut self, condition: T, placeholder: String, param: Parameter) -> Self {
-        self.add_segment_p("OR", condition);
-        self.param(placeholder, param);
+    pub fn and_or<T, C>(mut self, column: C, conditions: Conditions, param: T) -> Self
+    where
+        T: From<T>,
+        Parameter: From<T>,
+        C: ToString,
+    {
+        let (new_con, p) = self.condition(&column, conditions, param);
+
+        if self.and_or_exceptions {
+            self.add_segment_p("OR", new_con);
+            self.param(p);
+        } else {
+            self.add_segment_p("AND", new_con);
+            self.param(p);
+            self.and_or_exceptions = true
+        }
+
+        // if let Some(last) = self.segments.last() {
+        //     println!("Lst {:?}", last);
+        //     println!("new {:?}", new_con);
+
+        // let prefix = " = $";
+        // if let Some(index) = last.find(prefix) {
+        //     let result = &last[..index];
+        // }
+
+        // if last.to_string().eq(&new_con) {
+        //     self.add_segment_p("OR", new_con);
+        //     self.param(p);
+        // } else {
+        //     self.add_segment_p("AND", new_con);
+        //     self.param(p);
+        // }
+        // }
 
         self
+    }
+
+    pub fn or<T, C>(mut self, column: C, conditions: Conditions, param: T) -> Self
+    where
+        T: From<T>,
+        Parameter: From<T>,
+        C: ToString,
+    {
+        let (new_con, p) = self.condition(&column, conditions, param);
+
+        self.add_segment_p("OR", new_con);
+        self.param(p);
+
+        self
+    }
+
+    pub fn condition<T, C>(&self, c: &C, con: Conditions, p: T) -> (String, Parameter)
+    where
+        T: From<T>,
+        Parameter: From<T>,
+        C: ToString,
+    {
+        let parameter: Parameter = p.into();
+
+        let placeholder = self.next_param_index();
+
+        let condition = format!("{} {} ${}", c.to_string(), con.to_string(), placeholder);
+
+        (condition, parameter)
     }
 
 
@@ -182,8 +241,8 @@ impl<'a> QueryBuilder<'a> {
         format!("${}", self.params.len() + 1)
     }
 
-    pub fn param(&mut self, key: String, value: Parameter) -> &mut Self {
-        self.params.insert(key, value);
+    pub fn param(&mut self, value: Parameter) -> &mut Self {
+        self.params.insert(self.next_param_index().to_string(), value);
 
         self
     }

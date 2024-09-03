@@ -4,3 +4,5 @@
 RUST_LOG = "flowlocker=info"
 DEVELOPMENT = "dev"
 SCHEDULER_INTERVAL = "30s"
+SURREAL_DB_USER = "surreal_user"
+SURREAL_DB_PASSWORD = "dev_surreal_pass"

@@ -7,7 +7,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use strum_macros::Display;
 use tracing::error;
 
-use crate::db;
+use crate::{repository};
 use crate::rest_api::middleware;
 use crate::rest_api::routes::AppJson;
 
@@ -54,7 +54,7 @@ pub enum Error {
     ProcessExist(String),
 
     #[from]
-    DB(db::error::Error),
+    Repositry(repository::error::Error),
 
     #[from]
     SerdeJson(#[serde_as(as = "DisplayFromStr")] serde_json::Error),

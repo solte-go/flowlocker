@@ -6,6 +6,7 @@ mod rest_api;
 mod scheduler;
 mod time;
 mod config;
+mod repository;
 
 use tokio::signal;
 
