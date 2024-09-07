@@ -1,12 +1,12 @@
+mod config;
 mod db;
 mod error;
 mod logger;
 mod models;
+mod repository;
 mod rest_api;
 mod scheduler;
 mod time;
-mod config;
-mod repository;
 
 use tokio::signal;
 
@@ -40,7 +40,6 @@ async fn main() -> Result<()> {
         .with(tracer)
         .with(ErrorLayer::default())
         .init();
-
 
     // FOR DEV ONLY
     if config().development == "dev" {
@@ -88,7 +87,9 @@ async fn shutdown_signal() {
     }
 }
 
-
+// TODO remove after refactoring
+//
+//
 // let exporter = opentelemetry_stdout::LogExporterBuilder::default()
 //     // uncomment the below lines to pretty print output.
 //     // .with_encoder(|writer, data|

@@ -1,6 +1,6 @@
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 pub type Segment<'a> = Cow<'a, str>;
 
@@ -57,7 +57,6 @@ pub struct QueryBuilder<'a> {
     insert_exceptions: QueryBuilderInsertExceptions,
     and_or_exceptions: bool,
 }
-
 
 impl<'a> Default for QueryBuilder<'a> {
     fn default() -> Self {
@@ -152,24 +151,6 @@ impl<'a> QueryBuilder<'a> {
             self.and_or_exceptions = true
         }
 
-        // if let Some(last) = self.segments.last() {
-        //     println!("Lst {:?}", last);
-        //     println!("new {:?}", new_con);
-
-        // let prefix = " = $";
-        // if let Some(index) = last.find(prefix) {
-        //     let result = &last[..index];
-        // }
-
-        // if last.to_string().eq(&new_con) {
-        //     self.add_segment_p("OR", new_con);
-        //     self.param(p);
-        // } else {
-        //     self.add_segment_p("AND", new_con);
-        //     self.param(p);
-        // }
-        // }
-
         self
     }
 
@@ -185,6 +166,7 @@ impl<'a> QueryBuilder<'a> {
         self.param(p);
 
         self
+        // todo checks
     }
 
     pub fn condition<T, C>(&self, c: &C, con: Conditions, p: T) -> (String, Parameter)
@@ -201,7 +183,6 @@ impl<'a> QueryBuilder<'a> {
 
         (condition, parameter)
     }
-
 
     fn add_segment_p<T: Into<Segment<'a>>>(&mut self, prefix: &'a str, segment: T) -> &mut Self {
         self.add_segment(prefix).add_segment(segment)
@@ -242,7 +223,8 @@ impl<'a> QueryBuilder<'a> {
     }
 
     pub fn param(&mut self, value: Parameter) -> &mut Self {
-        self.params.insert(self.next_param_index().to_string(), value);
+        self.params
+            .insert(self.next_param_index().to_string(), value);
 
         self
     }
@@ -273,7 +255,9 @@ impl From<bool> for Parameter {
 }
 
 impl From<i32> for Parameter {
-    fn from(i: i32) -> Self { Parameter::IntArg(i) }
+    fn from(i: i32) -> Self {
+        Parameter::IntArg(i)
+    }
 }
 
 impl From<Parameter> for String {
@@ -302,7 +286,6 @@ impl From<Parameter> for i32 {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
