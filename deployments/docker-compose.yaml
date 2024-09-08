@@ -1,14 +1,13 @@
 name: flowlocker
-
 services:
-    surrealdb:
-        entrypoint:
-            - /surreal 
-            - start 
-            - --user
-            - $DB_USER
-            - --pass
-            - $DB_PASSWORD
-        image: surrealdb/surrealdb:latest
-        ports:
-            - "8000:8000"
+  surrealdb:
+    entrypoint:
+      - /surreal
+      - start
+      - --user
+      - $SURREAL_DB_USER
+      - --pass
+      - $SURREAL_DB_PASSWORD
+    image: surrealdb/surrealdb:latest
+    ports:
+      - "8000:8000"

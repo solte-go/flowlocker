@@ -2,8 +2,8 @@ include .env
 export
 
 #### ---- CHECKING FILES DEPENDENCIES ---- ####
-ifndef DB_USER
-ifndef DB_PASSWORD
+ifndef SURREAL_DB_USER
+ifndef SURREAL_DB_PASSWORD
 $(shell echo "DB_USER=\"login\"\nDB_PASSWORD=\"token\"" > .env)
 include .env
 endif
