@@ -4,7 +4,7 @@ export
 #### ---- CHECKING FILES DEPENDENCIES ---- ####
 ifndef SURREAL_DB_USER
 ifndef SURREAL_DB_PASSWORD
-$(shell echo "DB_USER=\"login\"\nDB_PASSWORD=\"token\"" > .env)
+$(shell echo "SURREAL_DB_USER=\"login\"\SURREAL_DB_PASSWORD=\"token\"" > .env)
 include .env
 endif
 endif
