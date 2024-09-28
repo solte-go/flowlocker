@@ -3,11 +3,11 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use derive_more::From;
 use serde::Serialize;
-use serde_with::{DisplayFromStr, serde_as};
+use serde_with::{serde_as, DisplayFromStr};
 use strum_macros::Display;
 use tracing::error;
 
-use crate::{repository};
+use crate::repository;
 use crate::rest_api::middleware;
 use crate::rest_api::routes::AppJson;
 
@@ -24,21 +24,20 @@ pub enum ApiError {
 
 #[derive(Debug)]
 pub(super) enum ErrorType {
-    ProcessExist
+    ProcessExist,
 }
 
 impl From<(ErrorType, String)> for ApiError {
     fn from(err: (ErrorType, String)) -> Self {
         Self::log_error(&err.0, &err.1);
         match err.0 {
-            ErrorType::ProcessExist => {
-                ApiError::ProcessExist(err.1)
-            }
+            ErrorType::ProcessExist => ApiError::ProcessExist(err.1),
         }
     }
 }
 
 impl ApiError {
+    // TODO Naming
     fn log_error(err: &ErrorType, message: &str) {
         let span = tracing::Span::current();
         error!(parent: &span, error_type = ?err, error_message = %message);
@@ -82,17 +81,11 @@ pub enum ClientError {
 impl Error {
     pub fn client_status_and_error(&self) -> (StatusCode, ClientError) {
         match self {
-            Error::ProcessExist { .. } => {
-                (StatusCode::LOCKED, ClientError::Exist)
-            }
-            _ => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ClientError::ServiceError,
-            ),
+            Error::ProcessExist { .. } => (StatusCode::LOCKED, ClientError::Exist),
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::ServiceError),
         }
     }
 }
-
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
@@ -120,19 +113,13 @@ impl IntoResponse for ApiError {
             //         "Something went wrong".to_owned(),
             //     )
             // }
-            ApiError::ProcessExist(e) => {
-                (StatusCode::LOCKED, e.to_string())
-            }
-            ApiError::BadRequest(e) => {
-                (StatusCode::BAD_REQUEST, e.to_string())
-            }
+            ApiError::ProcessExist(e) => (StatusCode::LOCKED, e.to_string()),
+            ApiError::BadRequest(e) => (StatusCode::BAD_REQUEST, e.to_string()),
 
-            _ => {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Something went wrong".to_owned(),
-                )
-            }
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Something went wrong".to_owned(),
+            ),
         };
 
         (status, AppJson(ErrorResponse { message })).into_response()

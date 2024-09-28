@@ -10,4 +10,4 @@ services:
       - $SURREAL_DB_PASSWORD
     image: surrealdb/surrealdb:latest
     ports:
-      - "8000:8000"
+      - "8005:8000"

@@ -17,7 +17,7 @@ pub struct Database {
 
 pub async fn new() -> Result<Database> {
     Ok(Database {
-        conn: Arc::new(Surreal::new::<Ws>("127.0.0.1:8000").await?),
+        conn: Arc::new(Surreal::new::<Ws>("127.0.0.1:8005").await?),
     })
 }
 

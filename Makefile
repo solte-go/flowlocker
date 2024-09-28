@@ -19,15 +19,15 @@ help: ### Display this help screen
 
 .PHONY: docker_compose_start
 docker_compose_start:  ### - run docker compose up command with detached option
-	docker compose -f ./deployments/docker-compose.yaml up -d
+	docker compose -f ./deployments/compose.yaml up -d
 
 .PHONY: docker_compose_down
 docker_compose_down:  ### - stop docker compose running containers setup
-	docker compose -f ./deployments/docker-compose.yaml down
+	docker compose -f ./deployments/compose.yaml down
 
 .PHONY: docker_compose_teardown
 docker_compose_teardown:  ### - stop and delete docker compose running containers setup
-	docker compose -f ./deployments/docker-compose.yaml down -v
+	docker compose -f ./deployments/compose.yaml down -v
 
 .PHONY: run
 run:  ### - run instance of flowlocker

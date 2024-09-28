@@ -39,9 +39,18 @@ opentelemetry = { version = "0.23.0", features = ["logs"] }
 opentelemetry_sdk = { version = "0.23.0", features = ["rt-tokio", "logs"] }
 opentelemetry-stdout = { version = "0.4.0", features = ["logs"] }
 opentelemetry-semantic-conventions = { version = "0.15.0" }
-opentelemetry-otlp = { version = "0.16.0", features = ["http-proto", "reqwest-client", "logs"] }
+opentelemetry-otlp = { version = "0.16.0", features = [
+    "http-proto",
+    "reqwest-client",
+    "logs",
+] }
 opentelemetry-appender-log = { version = "0.4.0", default-features = false }
-
+tower = "0.4"
+futures-util = "0.3"
+prometheus = "0.13"
+lazy_static = "1.5.0"
+regex-macro = "0.2.0"
+regex = "1.10.6"
 
 
 [dev-dependencies]

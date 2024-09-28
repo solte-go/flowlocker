@@ -54,7 +54,9 @@ async fn main() -> Result<()> {
 
     scheduler.start().await?;
 
-    let _run_axum = tokio::spawn(rest_api::server::new_server(database));
+    let _run_rest = tokio::spawn(rest_api::server::new_server(database));
+
+    let _run_monigoring = tokio::spawn(rest_api::server::new_monitoring_server());
 
     info!("Listening for signals");
 

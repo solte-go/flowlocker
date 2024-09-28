@@ -17,11 +17,14 @@ use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 use super::error::{ApiError, ErrorType, Result};
-use super::params::{GetProcesses, NewProcess, ProcessData, RequestEndpoint, UnlockProcess, UpdateProcess};
-use crate::repository::repository::{
-    check_running_processes, create_new_process, get_process_by_id, update_process_status, get_processes,
+use super::params::{
+    GetProcesses, NewProcess, ProcessData, RequestEndpoint, UnlockProcess, UpdateProcess,
 };
-use crate::models::{OperationStatus};
+use crate::models::OperationStatus;
+use crate::repository::repository::{
+    check_running_processes, create_new_process, get_process_by_id, get_processes,
+    update_process_status,
+};
 
 // Create our own JSON extractor by wrapping `axum::Json`. This makes it easy to override the
 // rejection and provide our own which formats errors to match our application.
@@ -45,7 +48,10 @@ pub fn routes(db: Database) -> Router {
         .route("/api/lock_new_process", post(create_new_lock))
         .route("/api/get_locked_process/:lock_id", get(get_locked_process))
         .route("/api/get_processes_list", get(get_processes_list))
-        .route("/api/update_process_status/:lock_id", post(set_process_status))
+        .route(
+            "/api/update_process_status/:lock_id",
+            post(set_process_status),
+        )
         .route("/api/unlock_process/:lock_id", post(unlock_process))
         .with_state(db)
 }
@@ -62,17 +68,15 @@ async fn create_new_lock(
 }
 
 #[instrument]
-async fn get_locked_process(
-    State(db): State<Database>,
-    Path(lock_id): Path<Uuid>,
-) -> Response {
-    let mut res = _handle_get_locked_process(db, lock_id).await.into_response();
+async fn get_locked_process(State(db): State<Database>, Path(lock_id): Path<Uuid>) -> Response {
+    let mut res = _handle_get_locked_process(db, lock_id)
+        .await
+        .into_response();
     res.extensions_mut()
         .insert(Arc::new(RequestEndpoint::GetLockedProcess));
 
     res
 }
-
 
 async fn get_processes_list(
     State(db): State<Database>,
@@ -116,10 +120,7 @@ async fn set_process_status(
         .into_response()
 }
 
-async fn unlock_process(
-    State(db): State<Database>,
-    Path(lock_id): Path<Uuid>,
-) -> Response {
+async fn unlock_process(State(db): State<Database>, Path(lock_id): Path<Uuid>) -> Response {
     _handle_set_process_status(db, lock_id.to_string(), UnlockProcess {})
         .await
         .into_response()
